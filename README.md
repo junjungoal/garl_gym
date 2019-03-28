@@ -22,5 +22,5 @@ python setup.py
 `````
 
 ## Example
-The example code is in ***test.ipynb*
+The example code is in **test.ipynb**
 `
