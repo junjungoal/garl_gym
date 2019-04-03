@@ -15,6 +15,10 @@ class BaseEnv(object):
     def convert_image(self):
         raise NotImplementedError
 
+    def plot_map_cv2(self, resize_width=1000, resize_height=1000):
+        img = cv2.resize(self.convert_img(), (resize_width,resize_height),
+                         interpolation=cv2.INTER_AREA)
+        cv2.imshow("World2", img)
 
     def plot_map(self):
         plt.figure(figsize=(10, 10))
