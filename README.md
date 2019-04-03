@@ -18,7 +18,7 @@ pip install -r requirements.txt pip install -e .
 Install the library
 
 ```
-python setup.py
+python setup.py install
 `````
 
 ## Example
