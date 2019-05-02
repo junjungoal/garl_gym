@@ -92,6 +92,7 @@ class SimplePopulationDynamics(BaseEnv):
             else:
                 agent.predator = False
                 agent.random = True # not trainable
+                agent.health = 1.0
 
             while True:
                 x = np.random.randint(0, self.h)
@@ -226,7 +227,8 @@ class SimplePopulationDynamics(BaseEnv):
         ## Exclude Grouping
 
     def decrease_health(self):
-        for i in range(self.predator_num):
+        #for i in range(self.predator_num):
+        for i in range(len(self.agents)):
             self.agents[i].health -= self.args.damage_per_step
 
     def increase_health(self, agent):
@@ -289,13 +291,16 @@ class SimplePopulationDynamics(BaseEnv):
                 self.increase_health(agent)
         return reward
 
-    def remove_dead_predators(self):
-        for predator in self.predators:
-            if predator.health <= 0:
-                self.agents.remove(predator)
-                self.ids.remove(predator.id)
-                x, y = predator.pos
-                self.predator_num -= 1
+    def remove_dead_agents(self):
+        for agent in self.agents:
+            if agent.health <= 0:
+                self.agents.remove(agent)
+                if agent.predator:
+                    self.ids.remove(agent.id)
+                    self.predator_num -= 1
+                else:
+                    self.prey_num -= 1
+                x, y = agent.pos
                 self.map[x][y] = 0
 
     def reset_env(self):
@@ -323,7 +328,7 @@ class SimplePopulationDynamics(BaseEnv):
         for agent in self.agents:
             obs.append(self._get_obs(agent))
 
-        self.remove_dead_predators()
+        self.remove_dead_agents()
 
         return obs, rewards
 
