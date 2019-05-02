@@ -14,7 +14,8 @@ env.make_world(wall_prob=0.02)
 #env.plot_map()
 
 for i in range(2000):
-    print('\ri', i, end='')
+    if i % 10 == 0:
+        print('time: {:d}'.format(i))
     actions = np.random.randint(5, size=10)
     rewards = env.step(actions)
     env.plot_map_cv2()
@@ -22,7 +23,5 @@ for i in range(2000):
         break
     if cv2.waitKey(100) & 0xFF == ord('q'):
         break
-
-
 
 print(env.predators,env.preys)
