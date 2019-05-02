@@ -35,12 +35,20 @@ class SimplePopulationDynamics(BaseEnv):
         self.w = args.width
 
         self.batch_size = args.batch_size
-        self.view_args = args.view_args
+        if hasattr(args, 'view_args'):
+            self.view_args = args.view_args
+        else:
+            self.view_args = None
 
         self.agent_num = args.predator_num
         self.predator_num = args.predator_num
         self.prey_num = args.prey_num
         self.action_num = args.num_actions
+
+
+        # might need to be varied, depending on individuals
+        self.vision_width = args.vision_width
+        self.vision_height = args.vision_height
 
         self.agents = []
         self.ids = []
@@ -129,6 +137,8 @@ class SimplePopulationDynamics(BaseEnv):
             return view_size1 if view_size_area1 < view_size_area2 else view_size2
 
         cur = 0
+        if self.view_args is None:
+            return [5, 5, 0]
         for k in self.view_args:
             k = [int(x) for x in k.split('-')]
             assert len(k) == 4
@@ -291,19 +301,29 @@ class SimplePopulationDynamics(BaseEnv):
     def reset_env(self):
         self.make_world()
 
-    def _get_obs(self):
-        raise NotImplementedError
+    def _get_obs(self, agent):
+        x, y = agent.pos
+        obs = self.map[max((x-self.vision_width//2)-1, 0):min((x+self.vision_width//2), self.map.shape[0]), max((y-self.vision_height//2)-1, 0):min((y+self.vision_height//2), self.map.shape[1])]
+        left_ex = abs(min((x-self.vision_width//2)-1, 0))
+        right_ex = max(x+self.vision_width//2 - self.map.shape[0], 0)
+        top_ex = abs(min((y-self.vision_height//2)-1, 0))
+        bottom_ex = max(y+self.vision_height//2-self.map.shape[1], 0)
+        obs = np.pad(obs, ((left_ex, right_ex), (top_ex, bottom_ex)), mode='constant', constant_values=-1).astype(np.float)
+        return obs
 
     def step(self, actions):
         self.take_actions(actions)
         self.decrease_health()
         rewards = []
+        obs = []
         self.killed = []
         for predator in self.predators:
             rewards.append(self.get_predator_reward(predator))
 
+        for agent in self.agents:
+            obs.append(self._get_obs(agent))
+
         self.remove_dead_predators()
 
-
-        return rewards
+        return obs, rewards
 
