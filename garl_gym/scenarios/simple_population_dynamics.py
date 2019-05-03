@@ -50,7 +50,6 @@ class SimplePopulationDynamics(BaseEnv):
         self.vision_width = args.vision_width
         self.vision_height = args.vision_height
 
-        self.agents = []
         self.ids = []
         self.map = np.zeros((self.h, self.w), dtype=np.int32)
         self.property = {}
@@ -58,6 +57,9 @@ class SimplePopulationDynamics(BaseEnv):
         self.killed = []
 
         # Health
+        self.max_health = args.max_health
+        self.min_health = args.min_health
+
         self.max_id = 0
 
         self.rewards = None
@@ -67,32 +69,37 @@ class SimplePopulationDynamics(BaseEnv):
         self.min_view_size = None
         self._init_property()
 
-    @property
-    def predators(self):
-        return self.agents[:self.predator_num]
+
+    #@property
+    #def predators(self):
+    #    return self.agents[:self.predator_num]
+
+    #@property
+    #def preys(self):
+    #    return self.agents[self.predator_num:]
 
     @property
-    def preys(self):
-        return self.agents[self.predator_num:]
+    def agents(self):
+        return self.predators + self.preys
+
 
 
     def make_world(self, wall_prob=0, wall_seed=10):
         self.gen_wall(wall_prob, wall_seed)
 
-        self.agents = [Agent() for _ in range(self.predator_num + self.prey_num)]
+        agents = [Agent() for _ in range(self.predator_num + self.prey_num)]
 
-        for i, agent in enumerate(self.agents):
+        for i, agent in enumerate(agents):
             agent.name = 'agent {:d}'.format(i+1)
+            agent.health = np.random.uniform(self.min_health, self.max_health)
             if i < self.predator_num:
                 agent.predator = True
-                agent.health = 1.0
                 agent.id = i+1
                 self.ids.append(i+1)
                 agent.property = [self._gen_power(i+1), [0, 0, 1]]
             else:
                 agent.predator = False
                 agent.random = True # not trainable
-                agent.health = 1.0
 
             while True:
                 x = np.random.randint(0, self.h)
@@ -105,6 +112,9 @@ class SimplePopulationDynamics(BaseEnv):
                         self.map[x][y] = -2
                     agent.pos = (x, y)
                     break
+
+            self.predators = agents[:self.predator_num]
+            self.preys = agents[self.predator_num:]
 
     def gen_wall(self, prob=0, seed=10):
         if prob == 0:
@@ -159,6 +169,18 @@ class SimplePopulationDynamics(BaseEnv):
 
             if cnt <= cur:
                 return power_list
+
+    def gen_preys(self, num):
+        raise NotImplementedError
+
+    def gen_predators(self, num):
+        raise NotImplementedError
+
+    def mate_predators(self):
+        raise NotImplementedError
+
+    def mate_preys(self):
+        raise NotImplementedError
 
     def take_actions(self, actions):
         self.actions = actions
@@ -294,14 +316,20 @@ class SimplePopulationDynamics(BaseEnv):
     def remove_dead_agents(self):
         for agent in self.agents:
             if agent.health <= 0:
-                self.agents.remove(agent)
                 if agent.predator:
+                    self.predators.remove(agent)
                     self.ids.remove(agent.id)
                     self.predator_num -= 1
                 else:
+                    self.preys.remove(agent)
                     self.prey_num -= 1
                 x, y = agent.pos
                 self.map[x][y] = 0
+            elif not agent.predator and agent.dead:
+                x, y = agent.pos
+                self.preys.remove(agent)
+                self.map[x][y] = 0
+                self.prey_num -= 1
 
     def reset_env(self):
         self.make_world()

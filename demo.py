@@ -7,7 +7,7 @@ import seaborn as sns
 import cv2
 
 args = {'predator_num': 20, 'prey_num': 40, 'num_actions': 5, 'height': 70, 'damage_per_step': 0.01, 'img_length': 5, 'hunt_radius': np.sqrt(8),
-        'width': 70, 'batch_size': 1, 'vision_width': 7, 'vision_height': 7}
+        'width': 70, 'batch_size': 1, 'vision_width': 7, 'vision_height': 7, 'max_health': 1.0, 'min_health': 0.5}
         #'width': 70, 'batch_size': 1, 'view_args': ['2500-5-5-0','2500-5-5-1','2500-5-5-2','']}
 args = AttrDict(args)
 
