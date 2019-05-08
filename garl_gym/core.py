@@ -40,4 +40,11 @@ class Agent(object):
         self.random = False
         self.id = None
         self.dead = False
+        self.original_health = None
+        self.cross_over=False
+        self.speed = None # how many cells the agent can moves
+        self.hunt_square = None
+        self.max_reward = 0
+        self.birth_time = None
+        self.age = 0
 

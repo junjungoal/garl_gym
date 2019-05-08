@@ -77,8 +77,6 @@ class SimplePopulationDynamics(BaseEnv):
         self.max_crossover = args.max_crossover
         self.timestep = 0
         self.num_food = 0
-        self.predator_id = 0
-        self.prey_id = 0
 
     #@property
     #def predators(self):
@@ -199,69 +197,102 @@ class SimplePopulationDynamics(BaseEnv):
             if cnt <= cur:
                 return power_list
 
-    def increase_food(self, prob):
-        num = max(1, int(self.num_food * prob))
-        for _ in range(num):
-            while True:
-                x = np.random.randint(0, self.h)
-                y = np.random.randint(0, self.w)
-                if self.map[x][y] != -1 and self.food_map[x][y] == 0:
-                    self.food_map[x][y] = -2
-                    self.num_food += 1
-                    break
+    def crossover_predators(self, mate_scope=20, crossover_rate=0.01):
+        for predator in self.predators:
+            if np.random.rand() < crossover_rate and predator.age > 10 and predator.cross_over==False:
+                x, y = predator.pos
+                local_map = self.map[x-mate_scope-1:x+mate_scope, y-mate_scope-1:y+mate_scope]
+                ind = np.where(local_map >0)
+                max_fitness =  -np.inf
+                mate_target = None
+                for (x_local, y_local) in zip(ind[0], ind[1]):
+                    id_ = local_map[x_local, y_local]
+                    target_predator = self.predators[self.predator_ids.index(id_)]
+                    if target_predator.cross_over==True:
+                        continue
+                    fitness = target_predator.max_reward
+                    if max_fitness < fitness:
+                        mate_target = target_predator
+                        max_fitness = fitness
 
-    def increase_predator(self, prob):
-        num = max(1, int(len(self.predators) * prob))
-        for _ in range(num):
-            agent = Agent()
-            agent.health = 1
-            agent.original_health = 1
-            agent.birth_time = self.timestep
-            agent.predator = True
-            while True:
-                id = np.random.randint(1, 2**31-1)
-                if id not in self.predator_ids:
-                    break
-            agent.id = id
-            self.ids.append(id)
-            self.predator_ids.append(agent.id)
-            agent.speed = np.random.choice(self.max_speed) + 1
-            agent.hunt_square = self.max_hunt_square - agent.speed+1
-            agent.property = [self._gen_power(id), [0, 0, 1]]
-            while True:
-                x = np.random.randint(0, self.h)
-                y = np.random.randint(0, self.w)
-                if self.map[x][y] == 0:
-                    self.map[x][y] = id
-                    agent.pos = (x, y)
-                    break
-            self.predators.append(agent)
+                if mate_target is not None:
+                    target_predator.cross_over=True
+                    new_predator = Agent()
+                    available_ind = np.where(self.map==0)
+                    while True:
+                        new_id = np.random.randint(2, self.h*self.w)
+                        if new_id not in self.predator_ids:
+                            new_predator.id = new_id
+                            new_predator.predator = True
+                            ind_loc = np.random.randint(0, len(available_ind[0]))
+                            new_x = max(x-mate_scope, 0)+available_ind[0][ind_loc]-1
+                            new_y = max(y-mate_scope, 0)+available_ind[1][ind_loc]-1
+                            ratio = np.random.uniform()
+                            #health = predator.original_health*ratio + target_predator.original_health*(1-ratio)
+                            health = 1
+                            new_predator.health = health
+                            new_predator.original_health = health
+                            new_predator.property = [self._gen_power(new_predator.id), [0, 0, 1]]
 
-    def increase_prey(self, prob):
-        num = max(1, int(len(self.preys) * prob))
-        for _ in range(num):
-            agent = Agent()
-            agent.health = 1
-            agent.original_health = 1
-            agent.birth_time = self.timestep
-            agent.predator = False
-            agent.random = True # not trainable
+                            # change
+                            new_predator.speed = predator.speed
+                            new_predator.hunt_square = predator.hunt_square
 
-            while True:
-                id = -np.random.randint(2, 2**31-1)
-                if id not in self.prey_ids:
-                    break
-            agent.id = id
-            self.ids.append(id)
-            self.prey_ids.append(agent.id)
-            while True:
-                x = np.random.randint(0, self.h)
-                y = np.random.randint(0, self.w)
-                if self.map[x][y] == 0:
-                    self.map[x][y] = agent.id
-                    agent.pos = (x, y)
-                    break
-            self.preys.append(agent)
+                            self.map[new_x, new_y] = new_id
+                            new_predator.pos = (new_x, new_y)
+                            self.predator_ids.append(new_id)
+                            self.ids.append(new_id)
+                            self.predators.append(new_predator)
+                            break
+
+
+
+    def crossover_preys(self, mate_scope=10, crossover_rate=0.01):
+        for prey in self.preys:
+            #if np.random.rand() < crossover_rate and prey.age > 10:
+            if np.random.rand() < crossover_rate and prey.age > 10 and prey.cross_over == False:
+                x, y = prey.pos
+                local_map = self.map[x-mate_scope-1:x+mate_scope, y-mate_scope-1:y+mate_scope]
+                ind = np.where(local_map < -2)
+                min_dist = np.inf
+                mate_target = None
+                available_ind = np.where(local_map == 0)
+                if len(available_ind[0]) == 0:
+                    continue
+                for (x_local, y_local) in zip(ind[0], ind[1]):
+                    id_ = local_map[x_local, y_local]
+                    target_prey = self.preys[self.prey_ids.index(id_)]
+                    if target_prey.cross_over==True or target_prey.age <= 10:
+                        continue
+                    x_target, y_target = target_prey.pos
+                    dist = (x-x_target)**2+(y-y_target)**2
+                    if dist < min_dist:
+                        mate_target = target_prey
+                        min_dist = dist
+
+                if mate_target is not None:
+                    mate_target.cross_over=True
+                   # for _ in range(np.random.choice(self.max_crossover)+1):
+                    new_prey = Agent()
+                    while True:
+                        new_id = -np.random.randint(3, self.h*self.w)
+                        if new_id not in self.prey_ids:
+                            new_prey.id = new_id
+                            new_prey.predator = False
+                            new_prey.random=True
+                            ind_loc = np.random.randint(0, len(available_ind[0]))
+                            new_x = max(x-mate_scope, 0)+available_ind[0][ind_loc] - 1
+                            new_y = max(y-mate_scope, 0)+available_ind[1][ind_loc] - 1
+                            ratio = np.random.uniform()
+                            #health = prey.original_health*ratio + mate_target.original_health*(1-ratio)
+                            health = 1
+                            new_prey.health = health
+                            new_prey.original_health = health
+                            self.map[new_x, new_y] = new_id
+                            new_prey.pos = (new_x, new_y)
+                            self.prey_ids.append(new_id)
+                            self.preys.append(new_prey)
+                            break
 
 
 
@@ -293,7 +324,7 @@ class SimplePopulationDynamics(BaseEnv):
                 self.map[x][y] = 0
                 if self.food_map[new_x, new_y] == -2:
                     self.food_map[new_x, new_y] = 0
-                    agent.health += 0.1
+                    agent.health += 0.2
                     self.num_food -= 1
                 break
 
@@ -330,6 +361,17 @@ class SimplePopulationDynamics(BaseEnv):
         self.map[x][y] = 0
         self.map[new_x][new_y] = agent.id
 
+    def increase_food(self, prob):
+        num = max(1, int(self.num_food * prob))
+        for _ in range(num):
+            while True:
+                x = np.random.randint(0, self.h)
+                y = np.random.randint(0, self.w)
+                if self.map[x][y] != -1 and self.food_map[x][y] == 0:
+                    self.food_map[x][y] = -2
+                    self.num_food += 1
+                    break
+
 
         ## Exclude Grouping
 
@@ -340,7 +382,7 @@ class SimplePopulationDynamics(BaseEnv):
         agent.health -= self.args.damage_per_step
 
     def increase_health(self, agent):
-        agent.health += 0.2
+        agent.health += 0.02
 
 
     def dump_image(self, img_name):
@@ -409,9 +451,8 @@ class SimplePopulationDynamics(BaseEnv):
 
     def remove_dead_agents(self):
         for agent in self.agents:
-            #if agent.health <= 0 or np.random.rand() < 0.05:
+            if agent.health <= 0:
             #if agent.health <= 0:
-            if (agent.health <= 0):
                 if agent.predator:
                     self.predators.remove(agent)
                     self.ids.remove(agent.id)
