@@ -1,13 +1,13 @@
 import os
 import numpy as np
 from attrdict import AttrDict
-from garl_gym.scenarios.simple_population_dynamics import SimplePopulationDynamics
+from garl_gym.scenarios.simple_population_dynamics_ga import SimplePopulationDynamics
 import matplotlib.pyplot as plt
 import seaborn as sns
 import cv2
 
-args = {'predator_num': 400, 'prey_num': 400, 'num_actions': 4, 'height': 100, 'damage_per_step': 0.05, 'img_length': 7, 'max_hunt_square': 3, 'max_speed': 3, 'max_acceleration': 3,
-        'width': 100, 'batch_size': 1, 'vision_width': 7, 'vision_height': 7, 'max_health': 1.0, 'min_health': 0.5, 'max_crossover': 3}
+args = {'predator_num': 200, 'prey_num': 800, 'num_actions': 4, 'height': 150, 'damage_per_step': 0.02, 'img_length': 7, 'max_hunt_square': 3, 'max_speed': 3, 'max_acceleration': 3,
+        'width': 150, 'batch_size': 1, 'vision_width': 7, 'vision_height': 7, 'max_health': 1.0, 'min_health': 0.5, 'max_crossover': 3}
         #'width': 70, 'batch_size': 1, 'view_args': ['2500-5-5-0','2500-5-5-1','2500-5-5-2','']}
 args = AttrDict(args)
 
@@ -38,16 +38,21 @@ for i in range(2000):
     if cv2.waitKey(100) & 0xFF == ord('q'):
         break
 
-    #env.crossover_preys(crossover_rate=0.15)
-    #env.crossover_predators(crossover_rate=0.01)
-    env.increase_prey(0.05)
-    env.increase_predator(0.05)
+    if len(env.predators) < 2:
+        env.increase_predator(0.2)
+    elif len(env.preys)<2:
+        env.increase_prey(0.2)
+
+    env.crossover_preys(crossover_rate=0.05)
+    env.crossover_predators(crossover_rate=0.05)
+    #env.increase_prey(0.03)
+    #env.increase_predator(0.006)
     env.increase_food(prob=0.005)
 
 sns.set_style("darkgrid")
 plt.plot(list(range(0, i, 10)), predators)
 plt.plot(list(range(0, i, 10)), preys)
-plt.plot(list(range(0, i, 10)), total_food)
+#plt.plot(list(range(0, i, 10)), total_food)
 plt.legend(['predators', 'preys'])
 plt.show()
 

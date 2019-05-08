@@ -201,14 +201,15 @@ class SimplePopulationDynamics(BaseEnv):
 
     def increase_food(self, prob):
         num = max(1, int(self.num_food * prob))
-        for _ in range(num):
-            while True:
-                x = np.random.randint(0, self.h)
-                y = np.random.randint(0, self.w)
-                if self.map[x][y] != -1 and self.food_map[x][y] == 0:
-                    self.food_map[x][y] = -2
-                    self.num_food += 1
-                    break
+        ind = np.where(self.food_map==0)
+        num = min(num, len(ind[0]))
+        perm = np.random.permutation(np.arange(len(ind[0])))
+        for i in range(num):
+            x = ind[0][perm[i]]
+            y = ind[1][perm[i]]
+            if self.map[x][y] != -1 and self.food_map[x][y] == 0:
+                self.food_map[x][y] = -2
+                self.num_food += 1
 
     def increase_predator(self, prob):
         num = max(1, int(len(self.predators) * prob))
@@ -239,7 +240,9 @@ class SimplePopulationDynamics(BaseEnv):
 
     def increase_prey(self, prob):
         num = max(1, int(len(self.preys) * prob))
-        for _ in range(num):
+        ind = np.where(self.map == 0)
+        perm = np.random.permutation(np.arange(len(ind[0])))
+        for i in range(num):
             agent = Agent()
             agent.health = 1
             agent.original_health = 1
@@ -254,13 +257,11 @@ class SimplePopulationDynamics(BaseEnv):
             agent.id = id
             self.ids.append(id)
             self.prey_ids.append(agent.id)
-            while True:
-                x = np.random.randint(0, self.h)
-                y = np.random.randint(0, self.w)
-                if self.map[x][y] == 0:
-                    self.map[x][y] = agent.id
-                    agent.pos = (x, y)
-                    break
+            x = ind[0][perm[i]]
+            y = ind[1][perm[i]]
+            if self.map[x][y] == 0:
+                self.map[x][y] = agent.id
+                agent.pos = (x, y)
             self.preys.append(agent)
 
 
@@ -340,7 +341,7 @@ class SimplePopulationDynamics(BaseEnv):
         agent.health -= self.args.damage_per_step
 
     def increase_health(self, agent):
-        agent.health += 0.2
+        agent.health += 0.1
 
 
     def dump_image(self, img_name):
@@ -443,15 +444,21 @@ class SimplePopulationDynamics(BaseEnv):
     def step(self, actions):
         self.take_actions(actions)
         rewards = []
-        obs = []
-        self.killed = []
+        pred_obs = []
+        prey_obs = []
+
+
         for predator in self.predators:
             rewards.append(self.get_predator_reward(predator))
 
-        for agent in self.agents:
-            obs.append(self._get_obs(agent))
-
         self.remove_dead_agents()
 
-        return obs, rewards
+        for agent in self.agents:
+            if agent.predator:
+                pred_obs.append(self._get_obs(agent))
+            else:
+                prey_obs.append(self._get_obs(agent))
+
+
+        return (pred_obs, prey_obs), rewards
 
