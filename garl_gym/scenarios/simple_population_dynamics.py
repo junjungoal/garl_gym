@@ -9,6 +9,7 @@ from cv2 import VideoWriter, imread, resize
 import cv2
 from copy import deepcopy
 from garl_gym.base import BaseEnv
+import multiprocessing
 
 from garl_gym.core import DiscreteWorld, Agent
 
@@ -447,18 +448,19 @@ class SimplePopulationDynamics(BaseEnv):
         pred_obs = []
         prey_obs = []
 
+        cores = multiprocessing.cpu_count()
+        pool = multiprocessing.Pool(processes=cores)
 
-        for predator in self.predators:
-            rewards.append(self.get_predator_reward(predator))
+        rewards = pool.map(self.get_predator_reward, self.predators)
+
+        #for predator in self.predators:
+        #    rewards.append(self.get_predator_reward(predator))
 
         self.remove_dead_agents()
 
-        for agent in self.agents:
-            if agent.predator:
-                pred_obs.append(self._get_obs(agent))
-            else:
-                prey_obs.append(self._get_obs(agent))
-
+        prey_obs = pool.map(self._get_obs, self.preys)
+        pred_obs = pool.map(self._get_obs, self.predators)
+        pool.close()
 
         return (pred_obs, prey_obs), rewards
 

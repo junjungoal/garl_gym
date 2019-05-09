@@ -1,7 +1,7 @@
 import os
 import numpy as np
 from attrdict import AttrDict
-from garl_gym.scenarios.simple_population_dynamics_ga import SimplePopulationDynamics
+from garl_gym.scenarios.simple_population_dynamics import SimplePopulationDynamics
 import matplotlib.pyplot as plt
 import seaborn as sns
 import cv2
@@ -43,10 +43,10 @@ for i in range(2000):
     elif len(env.preys)<2:
         env.increase_prey(0.2)
 
-    env.crossover_preys(crossover_rate=0.05)
-    env.crossover_predators(crossover_rate=0.05)
-    #env.increase_prey(0.03)
-    #env.increase_predator(0.006)
+    #env.crossover_preys(crossover_rate=0.05)
+    #env.crossover_predators(crossover_rate=0.05)
+    env.increase_prey(0.03)
+    env.increase_predator(0.006)
     env.increase_food(prob=0.005)
 
 sns.set_style("darkgrid")
@@ -55,9 +55,10 @@ plt.plot(list(range(0, i, 10)), preys)
 #plt.plot(list(range(0, i, 10)), total_food)
 plt.legend(['predators', 'preys'])
 plt.show()
-
-plt.figure()
-plt.plot(total_rewards)
-plt.show()
+#
+#plt.figure()
+#plt.plot(total_rewards)
+#plt.show()
+plt.savefig('dynamics.png')
 
 print(env.predators,env.preys)
