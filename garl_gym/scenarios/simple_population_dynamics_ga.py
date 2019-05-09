@@ -524,6 +524,17 @@ class SimplePopulationDynamics(BaseEnv):
             else:
                 prey_obs.append(self._get_obs(agent))
 
+        batch_pred_obs = []
+        batch_prey_obs = []
+        for i in range(int(np.ceil(1.*len(self.predators)/self.batch_size))):
+            st = self.batch_size * i
+            ed = st + self.batch_size
+            batch_pred_obs.append(pred_obs[st:ed])
+
+        for i in range(int(np.ceil(1.*len(self.preys)/self.batch_size))):
+            st = self.batch_size * i
+            ed = st + self.batch_size
+            batch_prey_obs.append(prey_obs[st:ed])
 
         return (pred_obs, prey_obs), rewards
 

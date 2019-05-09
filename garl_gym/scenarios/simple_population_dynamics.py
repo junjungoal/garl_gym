@@ -462,5 +462,18 @@ class SimplePopulationDynamics(BaseEnv):
         pred_obs = pool.map(self._get_obs, self.predators)
         pool.close()
 
-        return (pred_obs, prey_obs), rewards
+        batch_pred_obs = []
+        batch_prey_obs = []
+        for i in range(int(np.ceil(1.*len(self.predators)/self.batch_size))):
+            st = self.batch_size * i
+            ed = st + self.batch_size
+            batch_pred_obs.append(pred_obs[st:ed])
+
+        for i in range(int(np.ceil(1.*len(self.preys)/self.batch_size))):
+            st = self.batch_size * i
+            ed = st + self.batch_size
+            batch_prey_obs.append(prey_obs[st:ed])
+
+
+        return (batch_pred_obs, batch_prey_obs), rewards
 

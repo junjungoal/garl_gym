@@ -534,15 +534,36 @@ class SimplePopulationDynamics(BaseEnv):
     def step(self, actions):
         self.take_actions(actions)
         rewards = []
-        obs = []
-        self.killed = []
-        for predator in self.predators:
-            rewards.append(self.get_predator_reward(predator))
+        pred_obs = []
+        prey_obs = []
 
-        for agent in self.agents:
-            obs.append(self._get_obs(agent))
+        cores = multiprocessing.cpu_count()
+        pool = multiprocessing.Pool(processes=cores)
+
+        rewards = pool.map(self.get_predator_reward, self.predators)
+
+        #for predator in self.predators:
+        #    rewards.append(self.get_predator_reward(predator))
 
         self.remove_dead_agents()
 
-        return obs, rewards
+        prey_obs = pool.map(self._get_obs, self.preys)
+        pred_obs = pool.map(self._get_obs, self.predators)
+        pool.close()
+
+        batch_pred_obs = []
+        batch_prey_obs = []
+        for i in range(int(np.ceil(1.*len(self.predators)/self.batch_size))):
+            st = self.batch_size * i
+            ed = st + self.batch_size
+            batch_pred_obs.append(pred_obs[st:ed])
+
+        for i in range(int(np.ceil(1.*len(self.preys)/self.batch_size))):
+            st = self.batch_size * i
+            ed = st + self.batch_size
+            batch_prey_obs.append(prey_obs[st:ed])
+
+
+        return (batch_pred_obs, batch_prey_obs), rewards
+
 
