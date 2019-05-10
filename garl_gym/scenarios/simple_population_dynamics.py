@@ -440,7 +440,7 @@ class SimplePopulationDynamics(BaseEnv):
         top_ex = abs(min((y-self.vision_height//2)-1, 0))
         bottom_ex = max(y+self.vision_height//2-self.map.shape[1], 0)
         obs = np.pad(obs, ((left_ex, right_ex), (top_ex, bottom_ex)), mode='constant', constant_values=-1).astype(np.float)
-        return obs
+        return np.ravel(obs)
 
     def step(self, actions):
         self.take_actions(actions)
