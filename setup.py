@@ -128,6 +128,7 @@ setup(
     #
     #   py_modules=["my_module"],
     #
+    #packages=find_packages(exclude=['contrib', 'docs', 'tests']),  # Required
     packages=find_packages(exclude=['contrib', 'docs', 'tests']),  # Required
 
     # Specify which Python versions you support. In contrast to the
@@ -179,11 +180,11 @@ setup(
     #
     # For example, the following would provide a command called `sample` which
     # executes the function `main` from this package when invoked:
-    entry_points={  # Optional
-        'console_scripts': [
-            'sample=sample:main',
-        ],
-    },
+    #entry_points={  # Optional
+    #    'console_scripts': [
+    #        'sample=sample:main',
+    #    ],
+    #},
 
     # List additional URLs that are relevant to your project as a dict.
     #
