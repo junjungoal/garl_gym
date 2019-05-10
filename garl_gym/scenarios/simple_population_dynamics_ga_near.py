@@ -246,11 +246,8 @@ class SimplePopulationDynamics(BaseEnv):
                             break
 
 
-
-    def crossover_preys(self, mate_scope=10, crossover_rate=0.01):
+    def crossover_preys(self, mate_scope=20, crossover_rate=0.01):
         for prey in self.preys:
-            #if np.random.rand() < crossover_rate and prey.age > 10:
-            #if np.random.rand() < crossover_rate and prey.age > 10 and prey.cross_over == False:
             if np.random.rand() < crossover_rate:
                 x, y = prey.pos
                 local_map = self.map[x-mate_scope-1:x+mate_scope, y-mate_scope-1:y+mate_scope]
@@ -292,6 +289,59 @@ class SimplePopulationDynamics(BaseEnv):
                             self.prey_ids.append(new_id)
                             self.preys.append(new_prey)
                             break
+
+    def increase_predator(self, prob):
+        num = max(1, int(len(self.predators) * prob))
+        for _ in range(num):
+            agent = Agent()
+            agent.health = 1
+            agent.original_health = 1
+            agent.birth_time = self.timestep
+            agent.predator = True
+            while True:
+                id = np.random.randint(1, 2**31-1)
+                if id not in self.predator_ids:
+                    break
+            agent.id = id
+            self.ids.append(id)
+            self.predator_ids.append(agent.id)
+            agent.speed = np.random.choice(self.max_speed) + 1
+            agent.hunt_square = self.max_hunt_square - agent.speed+1
+            agent.property = [self._gen_power(id), [0, 0, 1]]
+            while True:
+                x = np.random.randint(0, self.h)
+                y = np.random.randint(0, self.w)
+                if self.map[x][y] == 0:
+                    self.map[x][y] = id
+                    agent.pos = (x, y)
+                    break
+            self.predators.append(agent)
+
+    def increase_prey(self, prob):
+        num = max(1, int(len(self.preys) * prob))
+        ind = np.where(self.map == 0)
+        perm = np.random.permutation(np.arange(len(ind[0])))
+        for i in range(num):
+            agent = Agent()
+            agent.health = 1
+            agent.original_health = 1
+            agent.birth_time = self.timestep
+            agent.predator = False
+            agent.random = True # not trainable
+
+            while True:
+                id = -np.random.randint(2, 2**31-1)
+                if id not in self.prey_ids:
+                    break
+            agent.id = id
+            self.ids.append(id)
+            self.prey_ids.append(agent.id)
+            x = ind[0][perm[i]]
+            y = ind[1][perm[i]]
+            if self.map[x][y] == 0:
+                self.map[x][y] = agent.id
+                agent.pos = (x, y)
+            self.preys.append(agent)
 
 
 
@@ -362,14 +412,15 @@ class SimplePopulationDynamics(BaseEnv):
 
     def increase_food(self, prob):
         num = max(1, int(self.num_food * prob))
-        for _ in range(num):
-            while True:
-                x = np.random.randint(0, self.h)
-                y = np.random.randint(0, self.w)
-                if self.map[x][y] != -1 and self.food_map[x][y] == 0:
-                    self.food_map[x][y] = -2
-                    self.num_food += 1
-                    break
+        ind = np.where(self.food_map==0)
+        num = min(num, len(ind[0]))
+        perm = np.random.permutation(np.arange(len(ind[0])))
+        for i in range(num):
+            x = ind[0][perm[i]]
+            y = ind[1][perm[i]]
+            if self.map[x][y] != -1 and self.food_map[x][y] == 0:
+                self.food_map[x][y] = -2
+                self.num_food += 1
 
 
         ## Exclude Grouping
@@ -482,16 +533,40 @@ class SimplePopulationDynamics(BaseEnv):
 
     def step(self, actions):
         self.take_actions(actions)
+        pred_rewards = []
+        pred_obs = []
+        prey_obs = []
         rewards = []
-        obs = []
-        self.killed = []
+
+
+        #pred_rewards = pool.map(self.get_predator_reward, self.predators)
+        #prey_rewards = pool.map(self.get_prey_reward, self.preys)
+
         for predator in self.predators:
             rewards.append(self.get_predator_reward(predator))
-
-        for agent in self.agents:
-            obs.append(self._get_obs(agent))
-
         self.remove_dead_agents()
 
-        return obs, rewards
+        cores = multiprocessing.cpu_count()
+        pool = multiprocessing.Pool(processes=cores)
+        #prey_obs = pool.map(self._get_obs, self.preys)
+        pred_obs = pool.map(self._get_obs, self.predators)
+        pool.close()
+
+
+        batch_pred_obs = []
+        batch_pred_rewards = []
+        batch_prey_obs = []
+        for i in range(int(np.ceil(1.*len(self.predators)/self.batch_size))):
+            st = self.batch_size * i
+            ed = st + self.batch_size
+            batch_pred_obs.append(pred_obs[st:ed])
+            batch_pred_rewards.append(pred_rewards[st:ed])
+
+        for i in range(int(np.ceil(1.*len(self.preys)/self.batch_size))):
+            st = self.batch_size * i
+            ed = st + self.batch_size
+            batch_prey_obs.append(prey_obs[st:ed])
+
+        return (batch_pred_obs, batch_prey_obs), batch_pred_rewards
+
 
