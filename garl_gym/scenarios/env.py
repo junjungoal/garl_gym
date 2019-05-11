@@ -8,11 +8,13 @@ import matplotlib.pyplot as plt
 from cv2 import VideoWriter, imread, resize
 import cv2
 from copy import deepcopy
+from garl_gym.base import BaseEnv
+import multiprocessing
 
-from garl_env.base import BaseScenario
+from garl_gym.core import DiscreteWorld, Agent
 
 
-class SimplePopulationDynamics(BaseScenario):
+class SimplePopulationDynamics(BaseEnv):
     '''
     args:
         - height
@@ -29,75 +31,140 @@ class SimplePopulationDynamics(BaseScenario):
 
     def __init__(self, args):
         self.args = args
-        self.h = args.height # grid size height
-        self.w = args.width # grid size width
-        self.batch_size = args.batch_size
-        self.view_args = args.view_args
 
-        self.agent_num = args.agent_number
-        self.tiger_num = 0
-        self.pig_num = 0
+        self.h = args.height
+        self.w = args.width
+
+        self.batch_size = args.batch_size
+        if hasattr(args, 'view_args'):
+            self.view_args = args.view_args
+        else:
+            self.view_args = None
+
+        self.agent_num = args.predator_num
+        self.predator_num = args.predator_num
+        self.prey_num = args.prey_num
         self.action_num = args.num_actions
 
+
+        # might need to be varied, depending on individuals
+        self.vision_width = args.vision_width
+        self.vision_height = args.vision_height
+
+        self.ids = []
         self.map = np.zeros((self.h, self.w), dtype=np.int32)
-        self.id_pos = {}
-        self.tiger_pos = set()
-        self.pig_pos = set()
+        self.food_map = np.zeros((self.h, self.w), dtype=np.int32)
         self.property = {}
 
+        self.killed = []
+
         # Health
-        self.health = {}
+        self.max_health = args.max_health
+        self.min_health = args.min_health
+
         self.max_id = 0
 
         self.rewards = None
-        self.reward_radius_pig = args.reward_radius_pig
-        self.reward_threshold_pig = args.reward_threshold_pig
 
         self.max_view_size = None
         self.min_view_size = None
-
         self._init_property()
 
+        self.predator_ids = []
+        self.prey_ids = []
+
+        self.max_hunt_square = args.max_hunt_square
+        self.max_speed = args.max_speed
+        self.max_crossover = args.max_crossover
+        self.timestep = 0
+        self.num_food = 0
+        self.predator_id = 0
+        self.prey_id = 0
+
+    #@property
+    #def predators(self):
+    #    return self.agents[:self.predator_num]
+
+    #@property
+    #def preys(self):
+    #    return self.agents[self.predator_num:]
+
+    @property
+    def agents(self):
+        return self.predators + self.preys
+
+
+
+    def make_world(self, wall_prob=0, wall_seed=10, food_prob=0.1, food_seed=10):
+        self.gen_wall(wall_prob, wall_seed)
+        self.gen_food(food_prob, food_seed)
+
+        agents = [Agent() for _ in range(self.predator_num + self.prey_num)]
+
+        for i, agent in enumerate(agents):
+            agent.name = 'agent {:d}'.format(i+1)
+            health = np.random.uniform(self.min_health, self.max_health)
+            agent.health = health
+            agent.original_health = health
+            agent.birth_time = self.timestep
+            if i < self.predator_num:
+                agent.predator = True
+                agent.id = i+1
+                self.ids.append(i+1)
+                self.predator_ids.append(agent.id)
+                agent.speed = np.random.choice(self.max_speed) + 1
+                agent.hunt_square = self.max_hunt_square - agent.speed+1
+                agent.property = [self._gen_power(i+1), [0, 0, 1]]
+            else:
+                agent.predator = False
+                agent.random = True # not trainable
+                agent.id = -i-2
+                self.prey_ids.append(agent.id)
+
+            while True:
+                x = np.random.randint(0, self.h)
+                y = np.random.randint(0, self.w)
+                if self.map[x][y] == 0:
+                    if agent.predator:
+                        self.map[x][y] = i+1
+                    else:
+                        # we don't need to recognize each individual in prey in this environment
+                        self.map[x][y] = -i-2
+                    agent.pos = (x, y)
+                    break
+
+            self.predators = agents[:self.predator_num]
+            self.preys = agents[self.predator_num:]
+
+    def gen_food(self, prob=0.1, seed=10):
+        for i in range(self.h):
+            for j in range(self.w):
+                food_prob = np.random.rand()
+                if food_prob < prob and self.map[i][j] != -1 and self.food_map[i][j] == 0:
+                    self.food_map[i][j] = -2
+                    self.num_food += 1
+
+
+
+    def gen_wall(self, prob=0, seed=10):
+        if prob == 0:
+            return
+        np.random.seed(seed)
+
+        for i in range(self.h):
+            for j in range(self.w):
+                if i == 0 or i == self.h-1 or j == 0 or j == self.w - 1:
+                    self.map[i][j] = -1
+                    continue
+                wall_prob = np.random.rand()
+                if wall_prob < prob:
+                    self.map[i][j] = -1
+
     def _init_property(self):
-        self.property[-3] = [1, [0, 1, 0]]
-        self.property[-2] = [1, [1, 0, 0]]
+        self.property[-3] = [1, [1, 0, 0]]
+        self.property[-2] = [1, [0, 1, 0]]
         self.property[-1] = [1, [0, 0, 0]]
         self.property[0] = [1, [0.411, 0.411, 0.411]]
-
-
-    def gen_agent(self, agent_num=None):
-        if agent_num == None:
-            agent_num = self.args.agent_number
-
-        for i in range(agent_num):
-            while True:
-                # initialzie the agent's posision randomly
-                x = np.random.randint(0, self.h)
-                y = np.random.randint(0, self.w)
-                if self.map[x][y] == 0:
-                    self.map[x][y] = i+1
-                    self.id_pos[i+1] = (x, y)
-                    self.property[i + 1] = [self._gen_power(i+1), [0, 0, 1]] #gen_power?
-                    self.health[i+1] = 1.0
-                    # property, health, birth_year?
-                    break
-        # Assert
-
-        self.agent_num = self.args.agent_number
-        self.max_id = self.args.agent_number
-
-    def gen_pig(self, pig_nums=None):
-        if pig_nums == None:
-            pig_nums = self.args.pig_max_number
-        for i in range(pig_nums):
-            while True:
-                x = np.random.randint(0, self.h)
-                y = np.random.randint(0, self.w)
-                if self.map[x][y] == 0:
-                    self.map[x][y] = -2
-                    self.pig_pos.add((x, y))
-                    break
-        self.pig_num = self.pig_num + pig_nums
 
     def _gen_power(self, cnt):
         def max_view_size(view_size1, view_size2):
@@ -111,6 +178,8 @@ class SimplePopulationDynamics(BaseScenario):
             return view_size1 if view_size_area1 < view_size_area2 else view_size2
 
         cur = 0
+        if self.view_args is None:
+            return [5, 5, 0]
         for k in self.view_args:
             k = [int(x) for x in k.split('-')]
             assert len(k) == 4
@@ -131,209 +200,326 @@ class SimplePopulationDynamics(BaseScenario):
             if cnt <= cur:
                 return power_list
 
-    def update_pig_pos(self):
-        # movement is random.... why dont they try to escape with strategy?
-        def in_board(x, y):
-            return not (x < 0 or x >= self.h or y < 0 or y >= self.w)
+    def increase_food(self, prob):
+        num = max(1, int(self.num_food * prob))
+        ind = np.where(self.food_map==0)
+        num = min(num, len(ind[0]))
+        perm = np.random.permutation(np.arange(len(ind[0])))
+        for i in range(num):
+            x = ind[0][perm[i]]
+            y = ind[1][perm[i]]
+            if self.map[x][y] != -1 and self.food_map[x][y] == 0:
+                self.food_map[x][y] = -2
+                self.num_food += 1
 
-        # Move Pigs
-        for i, item in enumerate(self.pig_pos):
-            x, y = item
-            direction = [(-1, 0), (1, 0), (0, 1), (0, -1), (0, 0)]
-            np.random.shuffle(direction)
-            for pos_x, pos_y in direction:
-                if (pos_x, pos_y) == (0, 0):
+    def increase_predator(self, prob):
+        num = max(1, int(len(self.predators) * prob))
+        for _ in range(num):
+            agent = Agent()
+            agent.health = 1
+            agent.original_health = 1
+            agent.birth_time = self.timestep
+            agent.predator = True
+            while True:
+                id = np.random.randint(1, 2**31-1)
+                if id not in self.predator_ids:
                     break
-                new_x = x + pos_x
-                new_y = y + pos_y
-
-                if in_board(new_x, new_y) and self.map[new_x][new_y] == 0:
-                    self.pig_pos.remove((x, y))
-                    self.pig_pos.add((new_x, new_y))
-                    self.map[new_x][new_y] = -2
-                    self.map[x][y] = 0
+            agent.id = id
+            self.ids.append(id)
+            self.predator_ids.append(agent.id)
+            agent.speed = np.random.choice(self.max_speed) + 1
+            agent.hunt_square = self.max_hunt_square - agent.speed+1
+            agent.property = [self._gen_power(id), [0, 0, 1]]
+            while True:
+                x = np.random.randint(0, self.h)
+                y = np.random.randint(0, self.w)
+                if self.map[x][y] == 0:
+                    self.map[x][y] = id
+                    agent.pos = (x, y)
                     break
+            self.predators.append(agent)
 
+    def increase_prey(self, prob):
+        num = max(1, int(len(self.preys) * prob))
+        ind = np.where(self.map == 0)
+        perm = np.random.permutation(np.arange(len(ind[0])))
+        for i in range(num):
+            agent = Agent()
+            agent.health = 1
+            agent.original_health = 1
+            agent.birth_time = self.timestep
+            agent.predator = False
+            agent.random = True # not trainable
 
-    def gen_wall(self, prob=0, seed=10):
-        if prob == 0:
-            return
-        np.random.seed(seed)
-
-        for i in range(self.h):
-            for j in range(self.w):
-                if i == 0 or i == self.h-1 or j == 0 or j == self.w - 1:
-                    self.map[i][j] = -1
-                    continue
-                wall_prob = np.random.rand()
-                if wall_prob < prob:
-                    self.map[i][j] = -1
-
-    def _agent_act(self, x, y, face, action, id):
-        '''
-        Face: face direction
-        '''
-        def move_forward(x, y, face):
-            if face == 0:
-                return x - 1, y
-            elif face == 1:
-                return x, y + 1
-            elif face == 2:
-                return x + 1, y
-            elif face == 3:
-                return x, y - 1
-
-        def move_backward(x, y, face):
-            if face == 0:
-                return x + 1, y
-            elif face == 1:
-                return x, y - 1
-            elif face == 2:
-                return x - 1, y
-            elif face == 3:
-                return x, y + 1
-
-        def move_left(x, y, face):
-            if face == 0:
-                return x, y - 1
-            elif face == 1:
-                return x - 1, y
-            elif face == 2:
-                return x, y + 1
-            elif face == 3:
-                return x + 1, y
-
-        def move_right(x, y, face):
-            if face == 0:
-                return x, y + 1
-            elif face == 1:
-                return x + 1, y
-            elif face == 2:
-                return x, y - 1
-            elif face == 3:
-                return x - 1, y
-        def in_board(x, y):
-            return self.map[x][y] == 0
-
-        def max_view_size(view_size1, view_size2):
-            view_size_area1 = (2 * view_size1[0] + 1) * (view_size1[1] + 1)
-            view_size_area2 = (2 * view_size2[0] + 1) * (view_size2[1] + 1)
-
-            return view_size1 if view_size_area1 > view_size_area2 else view_size2
-
-
-        if action == 0:
-            pass
-        elif action == 1:
-            new_x, new_y = move_forward(x, y, face)
-            if in_board(new_x, new_y):
-                self.map[x][y] = 0
-                self.map[new_x][new_y] = id
-                self.id_pos[id] = (new_x, new_y)
-        elif action == 2:
-            new_x, new_y = move_backward(x, y, face)
-            if in_board(new_x, new_y):
-                self.map[x][y] = 0
-                self.map[new_x][new_y] = id
-                self.id_pos[id] = (new_x, new_y)
-
-        elif action == 3:
-            new_x, new_y = move_right(x, y, face)
-            if in_board(new_x, new_y):
-                self.map[x][y] = 0
-                self.map[new_x][new_y] = id
-                self.id_pos[id] = (new_x, new_y)
-
-        elif action == 4:
-            new_x, new_y = move_left(x, y, face)
-            if in_board(new_x, new_y):
-                self.map[x][y] = 0
-                self.map[new_x][new_y] = id
-                self.id_pos[id] = (new_x, new_y)
-        elif action == 5:
-            self.property[id][0][2] = (face+4-1) % 4  # turn left
-        elif action == 6:
-            self.property[id][0][2] = (face+1) % 4 # turn right
-        else:
-            print(action)
-            print("Wrong Action ID!!!!")
-
-        ## Exclude Grouping
-
-    def decrease_health(self):
-        for id, _ in self.id_pos.items():
-            self.health[id] -= self.args.damage_per_step
+            while True:
+                id = -np.random.randint(2, 2**31-1)
+                if id not in self.prey_ids:
+                    break
+            agent.id = id
+            self.ids.append(id)
+            self.prey_ids.append(agent.id)
+            x = ind[0][perm[i]]
+            y = ind[1][perm[i]]
+            if self.map[x][y] == 0:
+                self.map[x][y] = agent.id
+                agent.pos = (x, y)
+            self.preys.append(agent)
 
 
 
     def take_actions(self, actions):
-        '''
-        Call action for each agent
-        '''
         self.actions = actions
-        for id, action in actions:
-            x, y = self.id_pos[id]
-            face = self.property[id][0][2]
-            self._agent_act(x, y, face, action, id)
+        for i, agent in enumerate(self.agents):
+            if agent.predator:
+                self._predator_action(agent, actions[i])
+            else:
+                self._prey_action(agent)
+            self.decrease_health(agent)
 
-    def get_reward_pig(self):
+    def _prey_action(self, agent):
         def in_board(x, y):
             return not (x < 0 or x >= self.h or y < 0 or y >= self.w)
 
-        x, y = self.pig_pos
-        groups_num = {}
-        for i in range(-self.reward_radius_pig, self.reward_radius_pig):
-            for j in range(-self.reward_radius_pig, self.reward_radius_pig):
-                new_x, new_y = x+i, y+j
-                if in_board(new_x, new_y):
-                    id = self.map[new_x][new_y]
-                    ## No group
-         #           if id > 0:
+        x, y = agent.pos
+        direction = [(-1, 0), (1, 0), (0, 1), (0, -1)]
+        np.random.shuffle(direction)
+        for pos_x, pos_y in direction:
+            if (pos_x, pos_y) == (0, 0):
+                break
+            new_x = x + pos_x
+            new_y = y + pos_y
+
+            if in_board(new_x, new_y) and self.map[new_x][new_y] == 0:
+                agent.pos = (new_x, new_y)
+                self.map[new_x][new_y] = agent.id
+                self.map[x][y] = 0
+                if self.food_map[new_x, new_y] == -2:
+                    self.food_map[new_x, new_y] = 0
+                    agent.health += 0.1
+                    self.num_food -= 1
+                break
 
 
 
+    def _predator_action(self, agent, action):
+        def in_board(x, y):
+            return not (x < 0 or x >= self.h or y < 0 or y >= self.w) and self.map[x][y] == 0
+        x, y = agent.pos
+        if action == 0:
+            new_x = x - agent.speed
+            new_y = y
+            if in_board(new_x, new_y):
+                agent.pos = (new_x, new_y)
+        elif action == 1:
+            new_x = x + agent.speed
+            new_y = y
+            if in_board(new_x, new_y):
+                agent.pos = (new_x, new_y)
+        elif action == 2:
+            new_x = x
+            new_y = y - agent.speed
+            if in_board(new_x, new_y):
+                agent.pos = (new_x, new_y)
+        elif action == 3:
+            new_x = x
+            new_y = y + agent.speed
+            if in_board(new_x, new_y):
+                agent.pos = (new_x, new_y)
+        else:
+            print('Wrong action id')
 
-    def make_video(self, images, outvid=None, fps=5, size=None, is_color=True, format='XVID'):
-        raise NotImplementedError
+        new_x, new_y = agent.pos
+        self.map[x][y] = 0
+        self.map[new_x][new_y] = agent.id
+
+
+        ## Exclude Grouping
+
+    def decrease_health(self, agent):
+        #for i in range(self.predator_num):
+        #for i in range(len(self.agents)):
+            #self.agents[i].health -= self.args.damage_per_step
+        agent.health -= self.args.damage_per_step
+
+    def increase_health(self, agent):
+        agent.health += 0.1
 
 
     def dump_image(self, img_name):
-        raise NotImplementedError
+        new_w, new_h = self.w * 5, self.h * 5
+        img = np.zeros((new_w, new_h, 3), dtype=np.uint8)
+        length = self.args.img_length
+        for i in range(self.h):
+            for j in range(self.w):
+                id = self.map[i][j]
+                if self.food_map[i][j] == -2:
+                    img[(i*length-1):(i+1)*length, (j*length-1):(j+1)*length, :] = 255*np.array(self.property[-2][1])
+                elif id <= 0 and id > -2:
+                    img[(i*length-1):(i+1)*length, (j*length-1):(j+1)*length, :] = 255*np.array(self.property[id][1])
+                else:
+                    # prey
+                    img[(i*length-1):(i+1)*length, (j*length-1):(j+1)*length, :] = 255*np.array(self.property[-3][1])
+
+        for predator in self.predators:
+            x, y = predator.pos
+            img[(x*length-1):(x+1)*length, (y*length-1):(y+1)*length, :] = 255 * np.array(predator.property[1])
+        plt.imshow(img/255.)
+        plt.show()
+        output_img = Image.fromarray(img, 'RGB')
+        output_img.save(img_name)
 
     def convert_img(self):
         img = np.zeros((self.h, self.w, 3))
         for i in range(self.h):
             for j in range(self.w):
                 id = self.map[i][j]
-                img[i, j, :] = 255*np.array(self.property[id][1])
+                if self.food_map[i][j] == -2:
+                    img[i, j, :] = 255*np.array(self.property[-2][1])
+                elif id <= 0 and id > -2:
+                    img[i, j, :] = 255*np.array(self.property[id][1])
+                else:
+                    # prey
+                    img[i, j, :] = 255*np.array(self.property[-3][1])
+
+        for predator in self.predators:
+            x, y = predator.pos
+            img[x, y, :] = 255*np.array(predator.property[1])
         return img
 
 
-    def plot_map(self):
-        plt.figure(figsize=(10, 10))
-        img = self.convert_img()
-        plt.imshow(img, interpolation="nearest")
-        #plt.imshow(self._layout > -1, interpolation="nearest")
-        ax = plt.gca()
-        ax.grid(0)
-        plt.xticks([])
-        plt.yticks([])
-        h, w = self.h, self.w
-        for y in range(h-1):
-            plt.plot([-0.5, w-0.5], [y+0.5, y+0.5], '-k', lw=2)
-        for x in range(w-1):
-            plt.plot([x+0.5, x+0.5], [-0.5, h-0.5], '-k', lw=2)
+    def get_predator_reward(self, agent):
+        preys = self.preys
+        reward = 0
+        x, y = agent.pos
+        local_map = self.map[x-agent.hunt_square-1:x+agent.hunt_square, y-agent.hunt_square-1:y+agent.hunt_square]
+        id_prey_loc = np.where(local_map < -2)
+
+        if len(id_prey_loc[0]) > 0:
+            min_dist = np.inf
+            target_prey = None
+            for (local_x_prey, local_y_prey) in zip(id_prey_loc[0], id_prey_loc[1]):
+                id_ = local_map[local_x_prey, local_y_prey]
+                prey = self.preys[self.prey_ids.index(id_)]
+                x_prey, y_prey = prey.pos
+                dist = np.sqrt((x-x_prey)**2+(y-y_prey)**2)
+                if dist < min_dist:
+                    min_dist = dist
+                    target_prey = prey
+
+            reward += 1
+            target_prey.dead = True
+            self.preys.remove(target_prey)
+            self.prey_ids.remove(target_prey.id)
+            self.prey_num -= 1
+            x, y = target_prey.pos
+            self.map[x][y] = 0
+            agent.max_reward += 1
+            self.increase_health(agent)
+        return reward
+
+    def get_prey_reward(self, agent):
+        x, y = agent.pos
+        reward = 0
+        if self.food_map[x, y] == -2:
+            self.food_map[x, y] = 0
+            agent.health += 0.1
+            reward += 1
+        return reward
+
+    def remove_dead_agents(self):
+        for agent in self.agents:
+            #if agent.health <= 0 or np.random.rand() < 0.05:
+            #if agent.health <= 0:
+            if (agent.health <= 0):
+                if agent.predator:
+                    self.predators.remove(agent)
+                    self.ids.remove(agent.id)
+                    self.predator_ids.remove(agent.id)
+                    self.predator_num -= 1
+                else:
+                    self.preys.remove(agent)
+                    self.prey_num -= 1
+                    self.prey_ids.remove(agent.id)
+                x, y = agent.pos
+                self.map[x][y] = 0
+            else:
+                agent.age += 1
+                agent.crossover=False
+
+    def _get_obs(self, agent):
+        x, y = agent.pos
+        obs = self.map[max((x-self.vision_width//2)-1, 0):min((x+self.vision_width//2), self.map.shape[0]), max((y-self.vision_height//2)-1, 0):min((y+self.vision_height//2), self.map.shape[1])]
+        left_ex = abs(min((x-self.vision_width//2)-1, 0))
+        right_ex = max(x+self.vision_width//2 - self.map.shape[0], 0)
+        top_ex = abs(min((y-self.vision_height//2)-1, 0))
+        bottom_ex = max(y+self.vision_height//2-self.map.shape[1], 0)
+        obs = np.pad(obs, ((left_ex, right_ex), (top_ex, bottom_ex)), mode='constant', constant_values=-1).astype(np.float)
+        return (agent.id, np.ravel(obs))
+
+    def render(self):
+        pred_obs = []
+        prey_obs = []
+        cores = multiprocessing.cpu_count()
+        pool = multiprocessing.Pool(processes=cores)
+        #prey_obs = pool.map(self._get_obs, self.preys)
+        pred_obs = pool.map(self._get_obs, self.predators)
+        pool.close()
+        batch_pred_obs = []
+        batch_prey_obs = []
+        for i in range(int(np.ceil(1.*len(self.predators)/self.batch_size))):
+            st = self.batch_size * i
+            ed = st + self.batch_size
+            batch_pred_obs.append(pred_obs[st:ed])
+
+        for i in range(int(np.ceil(1.*len(self.preys)/self.batch_size))):
+            st = self.batch_size * i
+            ed = st + self.batch_size
+            batch_prey_obs.append(prey_obs[st:ed])
+        return (batch_pred_obs, batch_prey_obs)
+
+    def reset(self):
+        self.__init__(self.args)
+        self.make_world(wall_prob=self.args.wall_prob, wall_seed=self.args.wall_seed, food_prob=self.args.food_prob)
+
+        return self.render
+
+
+
 
     def step(self, actions):
         self.take_actions(actions)
-        self.decrease_health()
-        self.update_pig_pos()
+        pred_rewards = []
+        pred_obs = []
+        prey_obs = []
+        rewards = {}
+
+
+        #pred_rewards = pool.map(self.get_predator_reward, self.predators)
+        #prey_rewards = pool.map(self.get_prey_reward, self.preys)
+
+        for predator in self.predators:
+            rewards[predator.id] = self.get_predator_reward(predator)
+        #self.remove_dead_agents()
 
         cores = multiprocessing.cpu_count()
         pool = multiprocessing.Pool(processes=cores)
-        reward_ids_pig = pool.map(self.get_reward_pig, self.pig_pos)
+        #prey_obs = pool.map(self._get_obs, self.preys)
+        pred_obs = pool.map(self._get_obs, self.predators)
+        pool.close()
 
 
+        batch_pred_obs = []
+        batch_pred_rewards = []
+        batch_prey_obs = []
+        for i in range(int(np.ceil(1.*len(self.predators)/self.batch_size))):
+            st = self.batch_size * i
+            ed = st + self.batch_size
+            batch_pred_obs.append(pred_obs[st:ed])
 
+        for i in range(int(np.ceil(1.*len(self.preys)/self.batch_size))):
+            st = self.batch_size * i
+            ed = st + self.batch_size
+            batch_prey_obs.append(prey_obs[st:ed])
 
+        return (batch_pred_obs, batch_prey_obs), rewards
 

@@ -91,7 +91,7 @@ class SimplePopulationDynamics(BaseEnv):
 
     @property
     def agents(self):
-        return self.predators + self.preys
+        return {**self.predators, **self.preys}
 
 
 
@@ -99,7 +99,13 @@ class SimplePopulationDynamics(BaseEnv):
         self.gen_wall(wall_prob, wall_seed)
         self.gen_food(food_prob, food_seed)
 
+        predators = {}
+        preys = {}
+
         agents = [Agent() for _ in range(self.predator_num + self.prey_num)]
+
+        empty_cells_ind = np.where(self.map == 0)
+        perm = np.random.permutation(range(len(empty_cells_ind[0])))
 
         for i, agent in enumerate(agents):
             agent.name = 'agent {:d}'.format(i+1)
@@ -112,29 +118,27 @@ class SimplePopulationDynamics(BaseEnv):
                 agent.id = i+1
                 self.ids.append(i+1)
                 self.predator_ids.append(agent.id)
-                agent.speed = np.random.choice(self.max_speed) + 1
-                agent.hunt_square = self.max_hunt_square - agent.speed+1
+                agent.speed = 1
+                agent.hunt_square = 2
                 agent.property = [self._gen_power(i+1), [0, 0, 1]]
             else:
                 agent.predator = False
-                agent.random = True # not trainable
-                agent.id = -i-2
+                agent.id = i+1
                 self.prey_ids.append(agent.id)
+                agent.property = [self._gen_power(i+1), [1, 0, 0]]
 
-            while True:
-                x = np.random.randint(0, self.h)
-                y = np.random.randint(0, self.w)
-                if self.map[x][y] == 0:
-                    if agent.predator:
-                        self.map[x][y] = i+1
-                    else:
-                        # we don't need to recognize each individual in prey in this environment
-                        self.map[x][y] = -i-2
-                    agent.pos = (x, y)
-                    break
+            x = empty_cells_ind[0][perm[i]]
+            y = empty_cells_ind[1][perm[i]]
+            self.map[x][y] = i+1
+            agent.pos = (x, y)
 
-            self.predators = agents[:self.predator_num]
-            self.preys = agents[self.predator_num:]
+            if agent.predator:
+                predators[agent.id] = agent
+            else:
+                preys[agent.id] = agent
+
+            self.predators = predators
+            self.preys = preys
 
     def gen_food(self, prob=0.1, seed=10):
         for i in range(self.h):
@@ -214,12 +218,16 @@ class SimplePopulationDynamics(BaseEnv):
 
     def increase_predator(self, prob):
         num = max(1, int(len(self.predators) * prob))
-        for _ in range(num):
+        ind = np.where(self.map == 0)
+        perm = np.random.permutation(np.arange(len(ind[0])))
+
+        for i in range(num):
             agent = Agent()
             agent.health = 1
             agent.original_health = 1
             agent.birth_time = self.timestep
             agent.predator = True
+
             while True:
                 id = np.random.randint(1, 2**31-1)
                 if id not in self.predator_ids:
@@ -230,14 +238,12 @@ class SimplePopulationDynamics(BaseEnv):
             agent.speed = np.random.choice(self.max_speed) + 1
             agent.hunt_square = self.max_hunt_square - agent.speed+1
             agent.property = [self._gen_power(id), [0, 0, 1]]
-            while True:
-                x = np.random.randint(0, self.h)
-                y = np.random.randint(0, self.w)
-                if self.map[x][y] == 0:
-                    self.map[x][y] = id
-                    agent.pos = (x, y)
-                    break
-            self.predators.append(agent)
+            x = ind[0][perm[i]]
+            y = ind[1][perm[i]]
+            if self.map[x][y] == 0:
+                self.map[x][y] = agent.id
+                agent.pos = (x, y)
+            self.predators[id] = agent
 
     def increase_prey(self, prob):
         num = max(1, int(len(self.preys) * prob))
@@ -249,10 +255,9 @@ class SimplePopulationDynamics(BaseEnv):
             agent.original_health = 1
             agent.birth_time = self.timestep
             agent.predator = False
-            agent.random = True # not trainable
 
             while True:
-                id = -np.random.randint(2, 2**31-1)
+                id = np.random.randint(2, 2**31-1)
                 if id not in self.prey_ids:
                     break
             agent.id = id
@@ -263,41 +268,53 @@ class SimplePopulationDynamics(BaseEnv):
             if self.map[x][y] == 0:
                 self.map[x][y] = agent.id
                 agent.pos = (x, y)
-            self.preys.append(agent)
+            self.preys[id] = agent
 
 
 
     def take_actions(self, actions):
         self.actions = actions
-        for i, agent in enumerate(self.agents):
+        for id, agent in self.agents.items():
             if agent.predator:
-                self._predator_action(agent, actions[i])
+                self._predator_action(agent, actions[id])
+                self.decrease_health(agent)
             else:
-                self._prey_action(agent)
-            self.decrease_health(agent)
+                self._prey_action(agent, actions[id])
 
-    def _prey_action(self, agent):
+    def _prey_action(self, agent, action):
         def in_board(x, y):
-            return not (x < 0 or x >= self.h or y < 0 or y >= self.w)
-
+            return not (x < 0 or x >= self.h or y < 0 or y >= self.w) and self.map[x][y] == 0
         x, y = agent.pos
-        direction = [(-1, 0), (1, 0), (0, 1), (0, -1)]
-        np.random.shuffle(direction)
-        for pos_x, pos_y in direction:
-            if (pos_x, pos_y) == (0, 0):
-                break
-            new_x = x + pos_x
-            new_y = y + pos_y
-
-            if in_board(new_x, new_y) and self.map[new_x][new_y] == 0:
+        if action == 0:
+            new_x = x - 1
+            new_y = y
+            if in_board(new_x, new_y):
                 agent.pos = (new_x, new_y)
-                self.map[new_x][new_y] = agent.id
-                self.map[x][y] = 0
-                if self.food_map[new_x, new_y] == -2:
-                    self.food_map[new_x, new_y] = 0
-                    agent.health += 0.1
-                    self.num_food -= 1
-                break
+        elif action == 1:
+            new_x = x + 1
+            new_y = y
+            if in_board(new_x, new_y):
+                agent.pos = (new_x, new_y)
+        elif action == 2:
+            new_x = x
+            new_y = y - 1
+            if in_board(new_x, new_y):
+                agent.pos = (new_x, new_y)
+        elif action == 3:
+            new_x = x
+            new_y = y + 1
+            if in_board(new_x, new_y):
+                agent.pos = (new_x, new_y)
+        else:
+            print('Wrong action id')
+
+        new_x, new_y = agent.pos
+        self.map[x][y] = 0
+        self.map[new_x][new_y] = agent.id
+        if self.food_map[new_x, new_y] == -2:
+            self.food_map[new_x, new_y] = 0
+            agent.health += 0.1
+            self.num_food -= 1
 
 
 
@@ -306,23 +323,23 @@ class SimplePopulationDynamics(BaseEnv):
             return not (x < 0 or x >= self.h or y < 0 or y >= self.w) and self.map[x][y] == 0
         x, y = agent.pos
         if action == 0:
-            new_x = x - agent.speed
+            new_x = x - 1
             new_y = y
             if in_board(new_x, new_y):
                 agent.pos = (new_x, new_y)
         elif action == 1:
-            new_x = x + agent.speed
+            new_x = x + 1
             new_y = y
             if in_board(new_x, new_y):
                 agent.pos = (new_x, new_y)
         elif action == 2:
             new_x = x
-            new_y = y - agent.speed
+            new_y = y - 1
             if in_board(new_x, new_y):
                 agent.pos = (new_x, new_y)
         elif action == 3:
             new_x = x
-            new_y = y + agent.speed
+            new_y = y + 1
             if in_board(new_x, new_y):
                 agent.pos = (new_x, new_y)
         else:
@@ -358,11 +375,12 @@ class SimplePopulationDynamics(BaseEnv):
                     img[(i*length-1):(i+1)*length, (j*length-1):(j+1)*length, :] = 255*np.array(self.property[id][1])
                 else:
                     # prey
-                    img[(i*length-1):(i+1)*length, (j*length-1):(j+1)*length, :] = 255*np.array(self.property[-3][1])
+                    agent = self.agents[id]
+                    img[(i*length-1):(i+1)*length, (j*length-1):(j+1)*length, :] = 255*np.array(agent.property[1])
 
-        for predator in self.predators:
-            x, y = predator.pos
-            img[(x*length-1):(x+1)*length, (y*length-1):(y+1)*length, :] = 255 * np.array(predator.property[1])
+        #for predator in self.predators.values():
+        #    x, y = predator.pos
+        #    img[(x*length-1):(x+1)*length, (y*length-1):(y+1)*length, :] = 255 * np.array(predator.property[1])
         plt.imshow(img/255.)
         plt.show()
         output_img = Image.fromarray(img, 'RGB')
@@ -381,7 +399,7 @@ class SimplePopulationDynamics(BaseEnv):
                     # prey
                     img[i, j, :] = 255*np.array(self.property[-3][1])
 
-        for predator in self.predators:
+        for predator in self.predators.values():
             x, y = predator.pos
             img[x, y, :] = 255*np.array(predator.property[1])
         return img
@@ -392,54 +410,54 @@ class SimplePopulationDynamics(BaseEnv):
         reward = 0
         x, y = agent.pos
         local_map = self.map[x-agent.hunt_square-1:x+agent.hunt_square, y-agent.hunt_square-1:y+agent.hunt_square]
-        id_prey_loc = np.where(local_map < -2)
+        id_prey_loc = np.where(local_map > 0)
 
-        if len(id_prey_loc[0]) > 0:
-            min_dist = np.inf
-            target_prey = None
-            for (local_x_prey, local_y_prey) in zip(id_prey_loc[0], id_prey_loc[1]):
-                id_ = local_map[local_x_prey, local_y_prey]
-                prey = self.preys[self.prey_ids.index(id_)]
-                x_prey, y_prey = prey.pos
+        min_dist = np.inf
+        target_prey = None
+        for (local_x, local_y) in zip(id_prey_loc[0], id_prey_loc[1]):
+            candidate_agent = self.agents[local_map[local_x, local_y]]
+            if not candidate_agent.predator:
+                x_prey, y_prey = candidate_agent.pos
                 dist = np.sqrt((x-x_prey)**2+(y-y_prey)**2)
                 if dist < min_dist:
                     min_dist = dist
-                    target_prey = prey
-
+                    target_prey = candidate_agent
+        if target_prey is not None:
             reward += 1
             target_prey.dead = True
-            self.preys.remove(target_prey)
-            self.prey_ids.remove(target_prey.id)
-            self.prey_num -= 1
-            x, y = target_prey.pos
-            self.map[x][y] = 0
             agent.max_reward += 1
             self.increase_health(agent)
         return reward
 
     def get_prey_reward(self, agent):
-        x, y = agent.pos
         reward = 0
-        if self.food_map[x, y] == -2:
-            self.food_map[x, y] = 0
-            agent.health += 0.1
-            reward += 1
+        if agent.dead:
+            reward = -1
         return reward
 
+    def get_reward(self, agent):
+        if agent.predator:
+            self.get_predator_reward(agent)
+        else:
+            self.get_prey_reward(agent)
+
     def remove_dead_agents(self):
-        for agent in self.agents:
+        for agent in self.agents.values():
             #if agent.health <= 0 or np.random.rand() < 0.05:
             #if agent.health <= 0:
             if (agent.health <= 0):
                 if agent.predator:
-                    self.predators.remove(agent)
-                    self.ids.remove(agent.id)
-                    self.predator_ids.remove(agent.id)
+                    del self.predators[agent.id]
                     self.predator_num -= 1
                 else:
-                    self.preys.remove(agent)
+                    del self.preys[agent.id]
                     self.prey_num -= 1
-                    self.prey_ids.remove(agent.id)
+                x, y = agent.pos
+                self.map[x][y] = 0
+            elif agent.dead:
+                # change this later
+                del self.preys[agent.id]
+                self.prey_num -= 1
                 x, y = agent.pos
                 self.map[x][y] = 0
             else:
@@ -454,7 +472,8 @@ class SimplePopulationDynamics(BaseEnv):
         top_ex = abs(min((y-self.vision_height//2)-1, 0))
         bottom_ex = max(y+self.vision_height//2-self.map.shape[1], 0)
         obs = np.pad(obs, ((left_ex, right_ex), (top_ex, bottom_ex)), mode='constant', constant_values=-1).astype(np.float)
-        return (agent.id, np.ravel(obs))
+        obs = np.array(np.ravel(obs).tolist().append(float(agent.predator)))
+        return (agent.id, obs)
 
     def render(self):
         pred_obs = []
@@ -493,33 +512,22 @@ class SimplePopulationDynamics(BaseEnv):
         prey_obs = []
         rewards = {}
 
-
-        #pred_rewards = pool.map(self.get_predator_reward, self.predators)
-        #prey_rewards = pool.map(self.get_prey_reward, self.preys)
-
-        for predator in self.predators:
-            rewards[predator.id] = self.get_predator_reward(predator)
-        #self.remove_dead_agents()
+        for agent in self.agents.values():
+            rewards[agent.id] = self.get_reward(agent)
 
         cores = multiprocessing.cpu_count()
         pool = multiprocessing.Pool(processes=cores)
         #prey_obs = pool.map(self._get_obs, self.preys)
-        pred_obs = pool.map(self._get_obs, self.predators)
+        #pred_obs = pool.map(self._get_obs, self.predators)
+        obs = pool.map(self._get_obs, self.agents.values())
         pool.close()
 
+        batch_obs = []
 
-        batch_pred_obs = []
-        batch_pred_rewards = []
-        batch_prey_obs = []
-        for i in range(int(np.ceil(1.*len(self.predators)/self.batch_size))):
+        for i in range(int(np.ceil(1.*len(self.agents)/self.batch_size))):
             st = self.batch_size * i
             ed = st + self.batch_size
-            batch_pred_obs.append(pred_obs[st:ed])
+            batch_obs.append(obs[st:ed])
 
-        for i in range(int(np.ceil(1.*len(self.preys)/self.batch_size))):
-            st = self.batch_size * i
-            ed = st + self.batch_size
-            batch_prey_obs.append(prey_obs[st:ed])
-
-        return (batch_pred_obs, batch_prey_obs), rewards
+        return batch_obs , rewards
 
