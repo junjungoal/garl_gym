@@ -353,16 +353,18 @@ class SimplePopulationDynamics(BaseEnv):
             for j in range(self.w):
                 id = self.map[i][j]
                 if self.food_map[i][j] == -2:
-                    img[i*length:i*(length+1), j*length:j*(length+1), :] = 255*np.array(self.property[-2][1])
+                    img[(i*length-1):(i+1)*length, (j*length-1):(j+1)*length, :] = 255*np.array(self.property[-2][1])
                 elif id <= 0 and id > -2:
-                    img[i*length:i*(length+1), j*length:j*(length+1), :] = 255*np.array(self.property[id][1])
+                    img[(i*length-1):(i+1)*length, (j*length-1):(j+1)*length, :] = 255*np.array(self.property[id][1])
                 else:
                     # prey
-                    img[i*length:i*(length+1), j*length:j*(length+1), :] = 255*np.array(self.property[-3][1])
+                    img[(i*length-1):(i+1)*length, (j*length-1):(j+1)*length, :] = 255*np.array(self.property[-3][1])
 
-        #for predator in self.predators:
-        #    x, y = predator.pos
-        #    img[x * length:x*(length+1), y*length:y*(length+1), :] = 255 * np.array(predator.property[1])
+        for predator in self.predators:
+            x, y = predator.pos
+            img[(x*length-1):(x+1)*length, (y*length-1):(y+1)*length, :] = 255 * np.array(predator.property[1])
+        plt.imshow(img/255.)
+        plt.show()
         output_img = Image.fromarray(img, 'RGB')
         output_img.save(img_name)
 
