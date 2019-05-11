@@ -33,7 +33,7 @@ for i in range(2000):
     obs, rewards = env.step(actions)
     #sum_rewards += np.sum(rewards)
     #env.remove_dead_agents()
-    #env.plot_map_cv2()
+    env.plot_map_cv2()
     if cv2.waitKey(100) & 0xFF == 27:
         break
     if cv2.waitKey(100) & 0xFF == ord('q'):

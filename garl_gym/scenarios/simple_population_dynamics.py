@@ -349,14 +349,20 @@ class SimplePopulationDynamics(BaseEnv):
         new_w, new_h = self.w * 5, self.h * 5
         img = np.zeros((new_w, new_h, 3), dtype=np.uint8)
         length = self.args.img_length
-        for i in range(self.w):
-            for j in range(self.h):
+        for i in range(self.h):
+            for j in range(self.w):
                 id = self.map[i][j]
-                if id <= 0:
-                    img[i * length:i*(length+1)][j * length:j*(length+1)] = 255 * np.array(self.property[id][1])
-        for predator in self.predators:
-            x, y = predator.pos
-            img[x * length:x*(length+1)][y* length:y*(length+1)] = 255 * np.array(predator.property[1])
+                if self.food_map[i][j] == -2:
+                    img[i*length:i*(length+1), j*length:j*(length+1), :] = 255*np.array(self.property[-2][1])
+                elif id <= 0 and id > -2:
+                    img[i*length:i*(length+1), j*length:j*(length+1), :] = 255*np.array(self.property[id][1])
+                else:
+                    # prey
+                    img[i*length:i*(length+1), j*length:j*(length+1), :] = 255*np.array(self.property[-3][1])
+
+        #for predator in self.predators:
+        #    x, y = predator.pos
+        #    img[x * length:x*(length+1), y*length:y*(length+1), :] = 255 * np.array(predator.property[1])
         output_img = Image.fromarray(img, 'RGB')
         output_img.save(img_name)
 
@@ -438,9 +444,6 @@ class SimplePopulationDynamics(BaseEnv):
                 agent.age += 1
                 agent.crossover=False
 
-    def reset_env(self):
-        self.make_world()
-
     def _get_obs(self, agent):
         x, y = agent.pos
         obs = self.map[max((x-self.vision_width//2)-1, 0):min((x+self.vision_width//2), self.map.shape[0]), max((y-self.vision_height//2)-1, 0):min((y+self.vision_height//2), self.map.shape[1])]
@@ -449,22 +452,52 @@ class SimplePopulationDynamics(BaseEnv):
         top_ex = abs(min((y-self.vision_height//2)-1, 0))
         bottom_ex = max(y+self.vision_height//2-self.map.shape[1], 0)
         obs = np.pad(obs, ((left_ex, right_ex), (top_ex, bottom_ex)), mode='constant', constant_values=-1).astype(np.float)
-        return np.ravel(obs)
+        return (agent.id, np.ravel(obs))
+
+    def render(self):
+        pred_obs = []
+        prey_obs = []
+        cores = multiprocessing.cpu_count()
+        pool = multiprocessing.Pool(processes=cores)
+        #prey_obs = pool.map(self._get_obs, self.preys)
+        pred_obs = pool.map(self._get_obs, self.predators)
+        pool.close()
+        batch_pred_obs = []
+        batch_prey_obs = []
+        for i in range(int(np.ceil(1.*len(self.predators)/self.batch_size))):
+            st = self.batch_size * i
+            ed = st + self.batch_size
+            batch_pred_obs.append(pred_obs[st:ed])
+
+        for i in range(int(np.ceil(1.*len(self.preys)/self.batch_size))):
+            st = self.batch_size * i
+            ed = st + self.batch_size
+            batch_prey_obs.append(prey_obs[st:ed])
+        return (batch_pred_obs, batch_prey_obs)
+
+    def reset(self):
+        self.__init__(self.args)
+        self.make_world(wall_prob=self.args.wall_prob, wall_seed=self.args.wall_seed, food_prob=self.args.food_prob)
+
+        return self.render
+
+
+
 
     def step(self, actions):
         self.take_actions(actions)
         pred_rewards = []
         pred_obs = []
         prey_obs = []
-        rewards = []
+        rewards = {}
 
 
         #pred_rewards = pool.map(self.get_predator_reward, self.predators)
         #prey_rewards = pool.map(self.get_prey_reward, self.preys)
 
         for predator in self.predators:
-            rewards.append(self.get_predator_reward(predator))
-        self.remove_dead_agents()
+            rewards[predator.id] = self.get_predator_reward(predator)
+        #self.remove_dead_agents()
 
         cores = multiprocessing.cpu_count()
         pool = multiprocessing.Pool(processes=cores)
@@ -480,12 +513,11 @@ class SimplePopulationDynamics(BaseEnv):
             st = self.batch_size * i
             ed = st + self.batch_size
             batch_pred_obs.append(pred_obs[st:ed])
-            batch_pred_rewards.append(pred_rewards[st:ed])
 
         for i in range(int(np.ceil(1.*len(self.preys)/self.batch_size))):
             st = self.batch_size * i
             ed = st + self.batch_size
             batch_prey_obs.append(prey_obs[st:ed])
 
-        return (batch_pred_obs, batch_prey_obs), batch_pred_rewards
+        return (batch_pred_obs, batch_prey_obs), rewards
 
