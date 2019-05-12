@@ -371,8 +371,6 @@ class SimplePopulationDynamics(BaseEnv):
         #for predator in self.predators.values():
         #    x, y = predator.pos
         #    img[(x*length-1):(x+1)*length, (y*length-1):(y+1)*length, :] = 255 * np.array(predator.property[1])
-        plt.imshow(img/255.)
-        plt.show()
         output_img = Image.fromarray(img, 'RGB')
         output_img.save(img_name)
 
@@ -483,7 +481,6 @@ class SimplePopulationDynamics(BaseEnv):
         pool = multiprocessing.Pool(processes=cores)
         obs = pool.map(self._get_obs, self.agents.values())
         pool.close()
-        pool.join()
         batch_obs = []
         for i in range(int(np.ceil(1.*len(self.agents)/self.batch_size))):
             st = self.batch_size * i
@@ -510,19 +507,6 @@ class SimplePopulationDynamics(BaseEnv):
         for agent in self.agents.values():
             rewards[agent.id] = self.get_reward(agent)
 
-        cores = multiprocessing.cpu_count()
-        pool = multiprocessing.Pool(processes=cores)
-        obs = pool.map(self._get_obs, self.agents.values())
-        pool.close()
-        pool.join()
-
-        batch_obs = []
-
-        for i in range(int(np.ceil(1.*len(self.agents)/self.batch_size))):
-            st = self.batch_size * i
-            ed = st + self.batch_size
-            batch_obs.append(obs[st:ed])
-
-
-        return batch_obs , rewards
+        batch_obs = self.render()
+        return batch_obs, rewards
 

@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import cv2
 
-args = {'predator_num': 100, 'prey_num': 100, 'num_actions': 4, 'height': 100, 'damage_per_step': 0.01, 'img_length': 5, 'max_hunt_square': 2, 'max_speed': 1, 'max_acceleration': 1,
-        'width': 100, 'batch_size': 1, 'vision_width': 7, 'vision_height': 7, 'max_health': 1.0, 'min_health': 0.5, 'max_crossover': 3}
+args = {'predator_num': 300, 'prey_num': 300, 'num_actions': 4, 'height': 100, 'damage_per_step': 0.01, 'img_length': 5, 'max_hunt_square': 2, 'max_speed': 1, 'max_acceleration': 1,
+        'width': 100, 'batch_size': 32, 'vision_width': 7, 'vision_height': 7, 'max_health': 1.0, 'min_health': 0.5, 'max_crossover': 3}
         #'width': 70, 'batch_size': 1, 'view_args': ['2500-5-5-0','2500-5-5-1','2500-5-5-2','']}
 args = AttrDict(args)
 

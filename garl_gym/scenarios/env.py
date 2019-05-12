@@ -14,7 +14,7 @@ import multiprocessing
 from garl_gym.core import DiscreteWorld, Agent
 
 
-class SimplePopulationDynamics(BaseEnv):
+class SimplePopulationDynamicsGA(BaseEnv):
     '''
     args:
         - height
