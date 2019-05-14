@@ -38,6 +38,7 @@ class Agent(object):
         self.property = None
         self.pos = None
         self.random = False
+        self.size = None
         self.id = None
         self.dead = False
         self.original_health = None

@@ -21,7 +21,7 @@ class SimplePopulationDynamics(BaseEnv):
         - width
         - batch_size
         - view_args
-        - agent_number
+        - agent_numbee
         - num_actions ... not necessary(add flag?)
         - damage_per_step
 
@@ -61,15 +61,13 @@ class SimplePopulationDynamics(BaseEnv):
         self.max_health = args.max_health
         self.min_health = args.min_health
 
-        self.max_id = 0
+        self.max_id = 1
 
         self.rewards = None
 
         self.max_view_size = None
         self.min_view_size = None
         self._init_property()
-
-        self.max_id = 1
 
 
         self.max_hunt_square = args.max_hunt_square
@@ -79,6 +77,7 @@ class SimplePopulationDynamics(BaseEnv):
         self.num_food = 0
         self.predator_id = 0
         self.prey_id = 0
+
 
     #@property
     #def predators(self):
@@ -120,14 +119,14 @@ class SimplePopulationDynamics(BaseEnv):
                 agent.property = [self._gen_power(i+1), [0, 0, 1]]
             else:
                 agent.predator = False
-                agent.id = self.max_id
+                agent.id = i+1
                 agent.property = [self._gen_power(i+1), [1, 0, 0]]
-            self.max_id += 1
 
             x = empty_cells_ind[0][perm[i]]
             y = empty_cells_ind[1][perm[i]]
-            self.map[x][y] = i+1
+            self.map[x][y] = self.max_id
             agent.pos = (x, y)
+            self.max_id += 1
 
             if agent.predator:
                 predators[agent.id] = agent
@@ -180,7 +179,7 @@ class SimplePopulationDynamics(BaseEnv):
 
         cur = 0
         if self.view_args is None:
-            return [5, 5, 0]
+            return [5, 5, np.random.randint(4)]
         for k in self.view_args:
             k = [int(x) for x in k.split('-')]
             assert len(k) == 4
@@ -213,65 +212,51 @@ class SimplePopulationDynamics(BaseEnv):
                 self.food_map[x][y] = -2
                 self.num_food += 1
 
-    def crossover_predator(self, mate_scope=11, crossover_rate=0.001):
+    def increase_predator(self, prob):
+        num = max(1, int(len(self.predators) * prob))
         ind = np.where(self.map == 0)
         perm = np.random.permutation(np.arange(len(ind[0])))
-        index = 0
-        for predator in self.predators.values():
-            x, y = predator.pos
-            local_map = self.map[(x-mate_scope//2-1):(x+mate_scope//2), (y-mate_scope//2-1):(y+mate_scope//2)]
-            agent_indice = np.where(local_map > 0)
-            if len(agent_indice[0]) == 0:
-                continue
 
-            for (local_x, local_y) in zip(agent_indice[0], agent_indice[1]):
-                candidate_id = local_map[local_x, local_y]
-                candidate_agent = self.agents[candidate_id]
-                if candidate_agent.predator:
-                    if np.random.rand() < crossover_prob:
-                        child = Agent()
-                        child.id = self.max_id
-                        self.max_id += 1
-                        child.spped = None
-                        child.hunt_square = self.max_hunt_square
-                        child.property = [self._gen_power(child.id), [0, 0, 1]]
-                        x = ind[0][perm[index]]
-                        y = ind[1][perm[index]]
-                        index += 1
-                        self.map[x][y] = child.id
-                        child.pos = (x, y)
-                        self.predators[child.id] = child
-                        self.predator_num += 1
+        for i in range(num):
+            agent = Agent()
+            agent.health = 1
+            agent.original_health = 1
+            agent.birth_time = self.timestep
+            agent.predator = True
 
-    def crossover_prey(self, mate_scope=5, crossover_prob=0.001):
+            agent.id = self.max_id
+            self.max_id += 1
+            agent.speed = 1
+            agent.hunt_square = self.max_hunt_square
+            agent.property = [self._gen_power(agent.id), [0, 0, 1]]
+            x = ind[0][perm[i]]
+            y = ind[1][perm[i]]
+            if self.map[x][y] == 0:
+                self.map[x][y] = agent.id
+                agent.pos = (x, y)
+            self.predators[agent.id] = agent
+
+    def increase_prey(self, prob):
+        num = max(1, int(len(self.preys) * prob))
         ind = np.where(self.map == 0)
         perm = np.random.permutation(np.arange(len(ind[0])))
-        index = 0
-        for prey in self.preys.values():
-            x, y = prey.pos
-            local_map = self.map[(x-mate_scope//2-1):(x+mate_scope//2), (y-mate_scope//2-1):(y+mate_scope//2)]
-            agent_indice = np.where(local_map > 0)
-            if len(agent_indice[0]) == 0:
-                continue
+        for i in range(num):
+            agent = Agent()
+            agent.health = 1
+            agent.original_health = 1
+            agent.birth_time = self.timestep
+            agent.predator = False
 
-            for (local_x, local_y) in zip(agent_indice[0], agent_indice[1]):
-                candidate_id = local_map[local_x, local_y]
-                candidate_agent = self.agents[candidate_id]
-                if not candidate_agent.edator:
-                    if np.random.rand() < crossover_prob:
-                        child = Agent()
-                        child.id = self.max_id
-                        self.max_id += 1
-                        child.spped = None
-                        child.hunt_square = self.max_hunt_square
-                        child.property = [self._gen_power(child.id), [0, 0, 1]]
-                        x = ind[0][perm[index]]
-                        y = ind[1][perm[index]]
-                        index += 1
-                        self.map[x][y] = child.id
-                        child.pos = (x, y)
-                        self.preys[child.id] = child
-                        self.prey_num += 1
+            agent.id = self.max_id
+            self.max_id += 1
+            agent.property = [self._gen_power(agent.id), [1, 0, 0]]
+            x = ind[0][perm[i]]
+            y = ind[1][perm[i]]
+            if self.map[x][y] == 0:
+                self.map[x][y] = agent.id
+                agent.pos = (x, y)
+            self.preys[agent.id] = agent
+
 
 
     def take_actions(self, actions):
@@ -285,27 +270,70 @@ class SimplePopulationDynamics(BaseEnv):
     def _prey_action(self, agent, action):
         def in_board(x, y):
             return not (x < 0 or x >= self.h or y < 0 or y >= self.w) and self.map[x][y] == 0
+        def move_forward(x, y, face):
+            if face == 0:
+                return x - 1, y
+            elif face == 1:
+                return x, y + 1
+            elif face == 2:
+                return x + 1, y
+            elif face == 3:
+                return x, y - 1
+
+        def move_backward(x, y, face):
+            if face == 0:
+                return x + 1, y
+            elif face == 1:
+                return x, y - 1
+            elif face == 2:
+                return x - 1, y
+            elif face == 3:
+                return x, y + 1
+
+        def move_left(x, y, face):
+            if face == 0:
+                return x, y - 1
+            elif face == 1:
+                return x - 1, y
+            elif face == 2:
+                return x, y + 1
+            elif face == 3:
+                return x + 1, y
+
+        def move_right(x, y, face):
+            if face == 0:
+                return x, y + 1
+            elif face == 1:
+                return x + 1, y
+            elif face == 2:
+                return x, y - 1
+            elif face == 3:
+                return x - 1, y
+
+
         x, y = agent.pos
+        face = agent.property[0][2]
         if action == 0:
-            new_x = x - 1
-            new_y = y
+            new_x, new_y = move_forward(x, y)
             if in_board(new_x, new_y):
                 agent.pos = (new_x, new_y)
         elif action == 1:
-            new_x = x + 1
-            new_y = y
+            new_x, new_y = move_backward(x, y)
             if in_board(new_x, new_y):
                 agent.pos = (new_x, new_y)
         elif action == 2:
-            new_x = x
-            new_y = y - 1
+            new_x, new_y = move_right(x, y)
             if in_board(new_x, new_y):
                 agent.pos = (new_x, new_y)
         elif action == 3:
-            new_x = x
-            new_y = y + 1
+            new_x, new_y = move_left(x, y)
             if in_board(new_x, new_y):
                 agent.pos = (new_x, new_y)
+        elif action == 4:
+            self.property[id][0][2] = (face + 4 - 1) % 4
+        elif action == 5:
+            self.property[id][0][2] = (face + 1) % 4
+
         else:
             print('Wrong action id')
 
@@ -322,27 +350,70 @@ class SimplePopulationDynamics(BaseEnv):
     def _predator_action(self, agent, action):
         def in_board(x, y):
             return not (x < 0 or x >= self.h or y < 0 or y >= self.w) and self.map[x][y] == 0
+        def move_forward(x, y, face):
+            if face == 0:
+                return x - 1, y
+            elif face == 1:
+                return x, y + 1
+            elif face == 2:
+                return x + 1, y
+            elif face == 3:
+                return x, y - 1
+
+        def move_backward(x, y, face):
+            if face == 0:
+                return x + 1, y
+            elif face == 1:
+                return x, y - 1
+            elif face == 2:
+                return x - 1, y
+            elif face == 3:
+                return x, y + 1
+
+        def move_left(x, y, face):
+            if face == 0:
+                return x, y - 1
+            elif face == 1:
+                return x - 1, y
+            elif face == 2:
+                return x, y + 1
+            elif face == 3:
+                return x + 1, y
+
+        def move_right(x, y, face):
+            if face == 0:
+                return x, y + 1
+            elif face == 1:
+                return x + 1, y
+            elif face == 2:
+                return x, y - 1
+            elif face == 3:
+                return x - 1, y
+
+
         x, y = agent.pos
+        face = agent.property[0][2]
         if action == 0:
-            new_x = x - 1
-            new_y = y
+            new_x, new_y = move_forward(x, y)
             if in_board(new_x, new_y):
                 agent.pos = (new_x, new_y)
         elif action == 1:
-            new_x = x + 1
-            new_y = y
+            new_x, new_y = move_backward(x, y)
             if in_board(new_x, new_y):
                 agent.pos = (new_x, new_y)
         elif action == 2:
-            new_x = x
-            new_y = y - 1
+            new_x, new_y = move_right(x, y)
             if in_board(new_x, new_y):
                 agent.pos = (new_x, new_y)
         elif action == 3:
-            new_x = x
-            new_y = y + 1
+            new_x, new_y = move_left(x, y)
             if in_board(new_x, new_y):
                 agent.pos = (new_x, new_y)
+        elif action == 4:
+            self.property[id][0][2] = (face + 4 - 1) % 4
+        elif action == 5:
+            self.property[id][0][2] = (face + 1) % 4
+
         else:
             print('Wrong action id')
 
@@ -360,7 +431,7 @@ class SimplePopulationDynamics(BaseEnv):
         agent.health -= self.args.damage_per_step
 
     def increase_health(self, agent):
-        agent.health += 0.1
+        agent.health += 4
 
 
     def dump_image(self, img_name):
@@ -426,19 +497,23 @@ class SimplePopulationDynamics(BaseEnv):
             target_prey.dead = True
             agent.max_reward += 1
             self.increase_health(agent)
+        else:
+            reward -= 1
         return reward
 
     def get_prey_reward(self, agent):
         reward = 0
         if agent.dead:
-            reward = -0.5
+            reward -= 1
+        else:
+            reward += 1
         return reward
 
     def get_reward(self, agent):
         if agent.predator:
-            return self.get_predator_reward(agent)
+            return self.get_predator_reward(agent) / len(self.predators)
         else:
-            return self.get_prey_reward(agent)
+            return self.get_prey_reward(agent) / len(self.preys)
 
     def remove_dead_agents(self):
         killed = []

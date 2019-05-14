@@ -21,7 +21,7 @@ class SimplePopulationDynamics(BaseEnv):
         - width
         - batch_size
         - view_args
-        - agent_number
+        - agent_numbee
         - num_actions ... not necessary(add flag?)
         - damage_per_step
 
@@ -61,7 +61,7 @@ class SimplePopulationDynamics(BaseEnv):
         self.max_health = args.max_health
         self.min_health = args.min_health
 
-        self.max_id = 0
+        self.max_id = 1
 
         self.rewards = None
 
@@ -77,6 +77,7 @@ class SimplePopulationDynamics(BaseEnv):
         self.num_food = 0
         self.predator_id = 0
         self.prey_id = 0
+
 
     #@property
     #def predators(self):
@@ -112,7 +113,7 @@ class SimplePopulationDynamics(BaseEnv):
             agent.birth_time = self.timestep
             if i < self.predator_num:
                 agent.predator = True
-                agent.id = i+1
+                agent.id = self.max_id
                 agent.speed = 1
                 agent.hunt_square = 2
                 agent.property = [self._gen_power(i+1), [0, 0, 1]]
@@ -123,8 +124,9 @@ class SimplePopulationDynamics(BaseEnv):
 
             x = empty_cells_ind[0][perm[i]]
             y = empty_cells_ind[1][perm[i]]
-            self.map[x][y] = i+1
+            self.map[x][y] = self.max_id
             agent.pos = (x, y)
+            self.max_id += 1
 
             if agent.predator:
                 predators[agent.id] = agent
@@ -222,20 +224,17 @@ class SimplePopulationDynamics(BaseEnv):
             agent.birth_time = self.timestep
             agent.predator = True
 
-            while True:
-                id = np.random.randint(1, 2**31-1)
-                if id not in self.predators.keys():
-                    break
-            agent.id = id
-            agent.speed = np.random.choice(self.max_speed) + 1
-            agent.hunt_square = self.max_hunt_square - agent.speed+1
-            agent.property = [self._gen_power(id), [0, 0, 1]]
+            agent.id = self.max_id
+            self.max_id += 1
+            agent.speed = 1
+            agent.hunt_square = self.max_hunt_square
+            agent.property = [self._gen_power(agent.id), [0, 0, 1]]
             x = ind[0][perm[i]]
             y = ind[1][perm[i]]
             if self.map[x][y] == 0:
                 self.map[x][y] = agent.id
                 agent.pos = (x, y)
-            self.predators[id] = agent
+            self.predators[agent.id] = agent
 
     def increase_prey(self, prob):
         num = max(1, int(len(self.preys) * prob))
@@ -248,18 +247,15 @@ class SimplePopulationDynamics(BaseEnv):
             agent.birth_time = self.timestep
             agent.predator = False
 
-            while True:
-                id = np.random.randint(2, 2**31-1)
-                if id not in self.preys.keys():
-                    break
-            agent.id = id
-            agent.property = [self._gen_power(id), [1, 0, 0]]
+            agent.id = self.max_id
+            self.max_id += 1
+            agent.property = [self._gen_power(agent.id), [1, 0, 0]]
             x = ind[0][perm[i]]
             y = ind[1][perm[i]]
             if self.map[x][y] == 0:
                 self.map[x][y] = agent.id
                 agent.pos = (x, y)
-            self.preys[id] = agent
+            self.preys[agent.id] = agent
 
 
 
@@ -349,7 +345,7 @@ class SimplePopulationDynamics(BaseEnv):
         agent.health -= self.args.damage_per_step
 
     def increase_health(self, agent):
-        agent.health += 0.1
+        agent.health += 4
 
 
     def dump_image(self, img_name):
@@ -415,19 +411,23 @@ class SimplePopulationDynamics(BaseEnv):
             target_prey.dead = True
             agent.max_reward += 1
             self.increase_health(agent)
+        else:
+            reward -= 1
         return reward
 
     def get_prey_reward(self, agent):
         reward = 0
         if agent.dead:
-            reward = -0.5
+            reward -= 1
+        else:
+            reward += 1
         return reward
 
     def get_reward(self, agent):
         if agent.predator:
-            return self.get_predator_reward(agent)
+            return self.get_predator_reward(agent) / len(self.predators)
         else:
-            return self.get_prey_reward(agent)
+            return self.get_prey_reward(agent) / len(self.preys)
 
     def remove_dead_agents(self):
         killed = []
