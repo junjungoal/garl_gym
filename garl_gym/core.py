@@ -42,7 +42,7 @@ class Agent(object):
         self.id = None
         self.dead = False
         self.original_health = None
-        self.cross_over=False
+        self.crossover=False
         self.speed = None # how many cells the agent can moves
         self.hunt_square = None
         self.max_reward = 0

@@ -1,7 +1,8 @@
 import os
 import numpy as np
 from attrdict import AttrDict
-from garl_gym.scenarios.simple_population_dynamics import SimplePopulationDynamics
+#from garl_gym.scenarios.simple_population_dynamics import SimplePopulationDynamics
+from garl_gym.scenarios.simple_population_dynamics_ga_near import SimplePopulationDynamics
 import matplotlib.pyplot as plt
 import seaborn as sns
 import cv2
@@ -56,14 +57,14 @@ for i in range(2000):
  #   elif len(env.preys)<2:
  #       env.increase_prey(0.0001)
 
-    #env.crossover_preys(crossover_rate=0.6)
-    #env.crossover_predators(crossover_rate=0.01)
+    env.crossover_prey(crossover_rate=0.01)
+    env.crossover_predator(crossover_rate=0.01)
 #    env.increase_prey(0.06)
 #    env.increase_predator(0.002)
     #env.crossover_preys(crossover_rate=0.05)
     #env.crossover_predators(crossover_rate=0.05)
-    env.increase_prey(0.006)
-    env.increase_predator(0.003)
+    #env.increase_prey(0.006)
+    #env.increase_predator(0.003)
     #env.increase_food(prob=0.005)
 
 sns.set_style("darkgrid")
