@@ -435,7 +435,7 @@ class SimplePopulationDynamics(BaseEnv):
             reward -= 1
 
         if agent.crossover:
-            reward += 1
+            reward += 2
         return reward
 
     def get_prey_reward(self, agent):
@@ -446,7 +446,7 @@ class SimplePopulationDynamics(BaseEnv):
             reward += 1
 
         if agent.crossover:
-            reward += 1
+            reward += 2
 
         return reward
 
