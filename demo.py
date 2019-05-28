@@ -2,7 +2,7 @@ import os
 import numpy as np
 from attrdict import AttrDict
 #from garl_gym.scenarios.simple_population_dynamics import SimplePopulationDynamics
-from garl_gym.scenarios.simple_population_dynamics_ga_near import SimplePopulationDynamics
+from garl_gym.scenarios.simple_population_dynamics_ga import SimplePopulationDynamicsGA
 import matplotlib.pyplot as plt
 import seaborn as sns
 import cv2
@@ -15,7 +15,7 @@ args = {'predator_num': 5000, 'prey_num': 5000, 'num_actions': 4, 'height':1000,
         #'width': 70, 'batch_size': 1, 'view_args': ['2500-5-5-0','2500-5-5-1','2500-5-5-2','']}
 args = AttrDict(args)
 
-env = SimplePopulationDynamics(args)
+env = SimplePopulationDynamicsGA(args)
 env.make_world(wall_prob=0.02, wall_seed=20, food_prob=0)
 #env.plot_map()
 
