@@ -111,7 +111,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
                 agent.predator = True
                 agent.id = self.max_id
                 agent.speed = 1
-                agent.hunt_square = 2
+                agent.hunt_square = self.max_hunt_square
                 agent.property = [self._gen_power(i+1), [0, 0, 1]]
             else:
                 agent.predator = False
@@ -216,7 +216,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
                 self.food_map[x][y] = -2
                 self.num_food += 1
 
-    def crossover_predator(self, mate_scope=7, crossover_rate=0.001):
+    def crossover_predator(self, mate_scope=3, crossover_rate=0.001):
         ind = np.where(self.map == 0)
         perm = np.random.permutation(np.arange(len(ind[0])))
         index = 0
@@ -250,7 +250,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
                         self.predators[child.id] = child
                         self.predator_num += 1
 
-    def crossover_prey(self, mate_scope=7, crossover_rate=0.001):
+    def crossover_prey(self, mate_scope=3, crossover_rate=0.001):
         ind = np.where(self.map == 0)
         perm = np.random.permutation(np.arange(len(ind[0])))
         index = 0
@@ -419,7 +419,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
         preys = self.preys
         reward = 0
         x, y = agent.pos
-        local_map = self.map[x-agent.hunt_square-1:x+agent.hunt_square, y-agent.hunt_square-1:y+agent.hunt_square]
+        local_map = self.map[(x-agent.hunt_square//2):(x-agent.hunt_square//2+agent.hunt_square), (y-agent.hunt_square//2):(y-agent.hunt_square//2+agent.hunt_square)]
         id_prey_loc = np.where(local_map > 0)
 
         min_dist = np.inf
