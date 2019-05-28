@@ -425,9 +425,10 @@ class SimplePopulationDynamics(BaseEnv):
 
     def get_reward(self, agent):
         if agent.predator:
-            return self.get_predator_reward(agent) / len(self.predators)
+            #return self.get_predator_reward(agent) / len(self.predators)
+            return self.get_predator_reward(agent)
         else:
-            return self.get_prey_reward(agent) / len(self.preys)
+            return self.get_prey_reward(agent)
 
     def remove_dead_agents(self):
         killed = []
