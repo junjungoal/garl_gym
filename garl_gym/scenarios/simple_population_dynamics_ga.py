@@ -75,6 +75,12 @@ class SimplePopulationDynamicsGA(BaseEnv):
         self.timestep = 0
         self.num_food = 0
 
+        self.obs_type = args.obs_type
+
+        self.agent_embeddings = {}
+        self.agent_emb_dim = args.agent_emb_dim
+
+
     #@property
     #def predators(self):
     #    return self.agents[:self.predator_num]
@@ -117,6 +123,8 @@ class SimplePopulationDynamicsGA(BaseEnv):
                 agent.predator = False
                 agent.id = i+1
                 agent.property = [self._gen_power(i+1), [1, 0, 0]]
+            new_embedding = np.random.normal(size=[self.agent_emb_dim])
+            self.agent_embeddings[agent.id] = new_embedding
 
             x = empty_cells_ind[0][perm[i]]
             y = empty_cells_ind[1][perm[i]]
@@ -237,6 +245,8 @@ class SimplePopulationDynamicsGA(BaseEnv):
                         child = Agent()
                         child.id = self.max_id
                         self.max_id += 1
+                        new_embedding = np.random.normal(size=[self.agent_emb_dim])
+                        self.agent_embeddings[child.id] = new_embedding
                         child.spped = None
                         child.predator = True
                         child.health = 1
@@ -274,6 +284,8 @@ class SimplePopulationDynamicsGA(BaseEnv):
                         child.speed = None
                         child.predator = False
                         child.health = 1
+                        new_embedding = np.random.normal(size=[self.agent_emb_dim])
+                        self.agent_embeddings[child.id] = new_embedding
                         child.hunt_square = self.max_hunt_square
                         child.property = [self._gen_power(child.id), [1, 0, 0]]
                         x = ind[0][perm[index]]
@@ -423,6 +435,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
 
         min_dist = np.inf
         target_prey = None
+        killed_id = None
         for (local_x, local_y) in zip(id_prey_loc[0], id_prey_loc[1]):
             candidate_agent = self.agents[local_map[local_x, local_y]]
             if not candidate_agent.predator:
@@ -435,18 +448,21 @@ class SimplePopulationDynamicsGA(BaseEnv):
             reward += 1
             target_prey.dead = True
             agent.max_reward += 1
+            killed_id = target_prey.id
             self.increase_health(agent)
+        if agent.health <= 0:
+            reward -= 1
         #else:
         #    reward -= 0.1
 
         if agent.crossover:
             reward += 1
-        return reward
+        return ((agent.id, reward), (agent.id, killed_id))
 
     def get_prey_reward(self, agent):
         reward = 0
-        #if agent.dead:
-        #    reward -= 1
+        if agent.dead:
+            reward -= 1
         #else:
         if not agent.dead:
             reward += 1
@@ -454,7 +470,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
         if agent.crossover:
             reward += 1
 
-        return reward
+        return ((agent.id, reward), (agent.id, None))
 
     def get_reward(self, agent):
         if agent.predator:
@@ -468,7 +484,6 @@ class SimplePopulationDynamicsGA(BaseEnv):
         for agent in self.agents.values():
             #if agent.health <= 0 or np.random.rand() < 0.05:
             #if agent.health <= 0:
-            #self.increase_health(agent)
             if (agent.health <= 0):
                 if agent.predator:
                     del self.predators[agent.id]
@@ -479,7 +494,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
                 killed.append(agent.id)
                 x, y = agent.pos
                 self.map[x][y] = 0
-            elif agent.dead:
+            elif agent.id in self.killed:
                 # change this later
                 killed.append(agent.id)
                 del self.preys[agent.id]
@@ -489,56 +504,84 @@ class SimplePopulationDynamicsGA(BaseEnv):
             else:
                 agent.age += 1
                 agent.crossover=False
+        self.killed = []
         return killed
 
     def _get_obs(self, agent):
         x, y = agent.pos
-        obs = np.zeros((self.vision_width, self.vision_height, 4))
+        obs = np.zeros((4+self.agent_emb_dim, self.vision_width, self.vision_height))
         new_x = x - self.vision_width//2 + np.arange(self.vision_width)
         new_y = y - self.vision_height//2 + np.arange(self.vision_height)
         local_map = self.map[(x-self.vision_width//2):(x-self.vision_width//2+self.vision_width), (y-self.vision_height//2):(y-self.vision_height//2+self.vision_height)]
+        obs[4:, self.vision_width//2, self.vision_height//2] = self.agent_embeddings[agent.id]
 
         object_indice = np.where(local_map != 0)
         for object_x, object_y in zip(object_indice[0], object_indice[1]):
             if local_map[object_x, object_y] > 0:
                 other_agent = self.agents[local_map[object_x, object_y]]
-                obs[object_x, object_y, :0] = other_agent.property[1][0]
-                obs[object_x, object_y, :1] = other_agent.property[1][1]
-                obs[object_x, object_y, :2] = other_agent.property[1][2]
-                obs[object_x, object_y, 3] = other_agent.health
+                agent_id = other_agent.id
+
+                obs[4:, object_x, object_y] = self.agent_embeddings[agent_id]
+
+                obs[:0, object_x, object_y] = other_agent.property[1][0]
+                obs[:1, object_x, object_y] = other_agent.property[1][1]
+                obs[:2, object_x, object_y] = other_agent.property[1][2]
+                obs[3, object_x, object_y] = other_agent.health
             elif local_map[object_x, object_y] == -1:
-                obs[object_x, object_y, :0] = self.property[-1][1][0]
-                obs[object_x, object_y, :1] = self.property[-1][1][1]
-                obs[object_x, object_y, :2] = self.property[-1][1][2]
+                obs[:0, object_x, object_y] = self.property[-1][1][0]
+                obs[:1, object_x, object_y] = self.property[-1][1][1]
+                obs[:2, object_x, object_y] = self.property[-1][1][2]
 
 
-        #for i in range(self.vision_width):
-        #    for j in range(self.vision_height):
-        #        new_x = x - self.vision_width//2 + i
-        #        new_y = y - self.vision_width//2 + j
-        #        if self.map[i, j] > 0:
-        #            other_agent = self.agents[self.map[i, j]]
-        #            obs[i, j, :0] = other_agent.property[1][0]
-        #            obs[i, j, :1] = other_agent.property[1][1]
-        #             obs[i, j, :2] = other_agent.property[1][2]
-        #            obs[i, j, 3] = other_agent.health
+        if self.obs_type == 'dense':
+            return (agent.id, obs.reshape(-1))
+        else:
+            return (agent.id, obs)
 
-        #        elif self.map[i, j] == -1:
-        #            obs[i, j, :0] = self.property[-1][1][0]
-        #            obs[i, j, :1] = self.property[-1][1][1]
-        #            obs[i, j, :2] = self.property[-1][1][2]
-        return (agent.id, obs.reshape(-1))
+    def _get_all(self, agent):
+        x, y = agent.pos
+        obs = np.zeros((4+self.agent_emb_dim, self.vision_width, self.vision_height))
+        new_x = x - self.vision_width//2 + np.arange(self.vision_width)
+        new_y = y - self.vision_height//2 + np.arange(self.vision_height)
+        local_map = self.map[(x-self.vision_width//2):(x-self.vision_width//2+self.vision_width), (y-self.vision_height//2):(y-self.vision_height//2+self.vision_height)]
+        obs[4:, self.vision_width//2, self.vision_height//2] = self.agent_embeddings[agent.id]
 
-    def render(self):
+        object_indice = np.where(local_map != 0)
+        for object_x, object_y in zip(object_indice[0], object_indice[1]):
+            if local_map[object_x, object_y] > 0:
+                other_agent = self.agents[local_map[object_x, object_y]]
+                agent_id = other_agent.id
+
+
+                obs[:0, object_x, object_y] = other_agent.property[1][0]
+                obs[:1, object_x, object_y] = other_agent.property[1][1]
+                obs[:2, object_x, object_y] = other_agent.property[1][2]
+                obs[3, object_x, object_y] = other_agent.health
+            elif local_map[object_x, object_y] == -1:
+                obs[:0, object_x, object_y] = self.property[-1][1][0]
+                obs[:1, object_x, object_y] = self.property[-1][1][1]
+                obs[:2, object_x, object_y] = self.property[-1][1][2]
+
+        rewards, killed = self.get_reward(agent)
+
+        if self.obs_type == 'dense':
+            return (agent.id, obs.reshape(-1)), rewards, killed
+        else:
+            return (agent.id, obs), rewards, killed
+
+    def remove_dead_agent_emb(self, dead_list):
+        for id in dead_list:
+            del self.agent_embeddings[id]
+
+
+    def render(self, only_view=False):
         cores = mp.cpu_count()
         pool = mp.Pool(processes=cores)
-        obs = pool.map(self._get_obs, self.agents.values())
+        if only_view:
+            obs = pool.map(self._get_obs, self.agents.values())
+        else:
+            obs = pool.map(self._get_all, self.agents.values())
         pool.close()
-        #batch_obs = []
-        #for i in range(int(np.ceil(1.*len(self.agents)/self.batch_size))):
-        #    st = self.batch_size * i
-        #    ed = st + self.batch_size
-        #    batch_obs.append(obs[st:ed])
         return obs
 
     def reset(self):
@@ -551,8 +594,13 @@ class SimplePopulationDynamicsGA(BaseEnv):
         self.take_actions(actions)
         rewards = {}
 
-        for agent in self.agents.values():
-            rewards[agent.id] = self.get_reward(agent)
-        obs = self.render()
-        return obs, rewards
+        obs, rewards, killed = zip(*self.render())
+        self.killed = list(dict(killed).values())
+        for id, killed in killed:
+            if killed is not None:
+                self.increase_health(self.agents[id])
+        return obs, dict(rewards)
+
+
+
 

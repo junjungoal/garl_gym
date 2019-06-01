@@ -399,7 +399,6 @@ class SimplePopulationDynamics(BaseEnv):
             img[x, y, :] = 255*np.array(predator.property[1])
         return img
 
-
     def get_predator_reward(self, agent):
         preys = self.preys
         reward = 0
@@ -426,15 +425,15 @@ class SimplePopulationDynamics(BaseEnv):
             reward -= 1
         #else:
         #    reward -= 1
-        return (reward, target_prey)
+        return ((agent.id, reward), target_prey)
 
     def get_prey_reward(self, agent):
         reward = 0
         if agent.dead:
             reward -= 1
         else:
-            reward += 0.1
-        return (reward, None)
+            reward += 1
+        return ((agent.id, reward), None)
 
     def get_reward(self, agent):
         if agent.predator:
@@ -458,7 +457,7 @@ class SimplePopulationDynamics(BaseEnv):
                 killed.append(agent.id)
                 x, y = agent.pos
                 self.map[x][y] = 0
-            elif agent in self.killed:
+            elif agent.dead:
                 # change this later
                 killed.append(agent.id)
                 del self.preys[agent.id]
@@ -468,7 +467,6 @@ class SimplePopulationDynamics(BaseEnv):
             else:
                 agent.age += 1
                 agent.crossover=False
-        self.killed = []
         return killed
 
     def _get_obs(self, agent):
@@ -495,44 +493,52 @@ class SimplePopulationDynamics(BaseEnv):
                 obs[:1, object_x, object_y] = self.property[-1][1][1]
                 obs[:2, object_x, object_y] = self.property[-1][1][2]
 
+
+        if self.obs_type == 'dense':
+            return (agent.id, obs.reshape(-1))
+        else:
+            return (agent.id, obs)
+
+    def _get_all(self, agent):
+        x, y = agent.pos
+        obs = np.zeros((4+self.agent_emb_dim, self.vision_width, self.vision_height))
+        new_x = x - self.vision_width//2 + np.arange(self.vision_width)
+        new_y = y - self.vision_height//2 + np.arange(self.vision_height)
+        local_map = self.map[(x-self.vision_width//2):(x-self.vision_width//2+self.vision_width), (y-self.vision_height//2):(y-self.vision_height//2+self.vision_height)]
+        obs[4:, self.vision_width//2, self.vision_height//2] = self.agent_embeddings[agent.id]
+
+        object_indice = np.where(local_map != 0)
+        for object_x, object_y in zip(object_indice[0], object_indice[1]):
+            if local_map[object_x, object_y] > 0:
+                other_agent = self.agents[local_map[object_x, object_y]]
+                agent_id = other_agent.id
+                obs[:0, object_x, object_y] = other_agent.property[1][0]
+                obs[:1, object_x, object_y] = other_agent.property[1][1]
+                obs[:2, object_x, object_y] = other_agent.property[1][2]
+                obs[3, object_x, object_y] = other_agent.health
+            elif local_map[object_x, object_y] == -1:
+                obs[:0, object_x, object_y] = self.property[-1][1][0]
+                obs[:1, object_x, object_y] = self.property[-1][1][1]
+                obs[:2, object_x, object_y] = self.property[-1][1][2]
+
         rewards, killed = self.get_reward(agent)
 
-
-        #for i in range(self.vision_width):
-        #    for j in range(self.vision_height):
-        #        new_x = x - self.vision_width//2 + i
-        #        new_y = y - self.vision_width//2 + j
-        #        if self.map[i, j] > 0:
-        #            other_agent = self.agents[self.map[i, j]]
-        #            obs[i, j, :0] = other_agent.property[1][0]
-        #            obs[i, j, :1] = other_agent.property[1][1]
-        #             obs[i, j, :2] = other_agent.property[1][2]
-        #            obs[i, j, 3] = other_agent.health
-
-        #        elif self.map[i, j] == -1:
-        #            obs[i, j, :0] = self.property[-1][1][0]
-        #            obs[i, j, :1] = self.property[-1][1][1]
-        #            obs[i, j, :2] = self.property[-1][1][2]
         if self.obs_type == 'dense':
             return (agent.id, obs.reshape(-1)), rewards, killed
         else:
             return (agent.id, obs), rewards, killed
-
     def remove_dead_agent_emb(self, dead_list):
         for id in dead_list:
             del self.agent_embeddings[id]
 
-
-    def render(self):
+    def render(self, only_view=False):
         cores = mp.cpu_count()
         pool = mp.Pool(processes=cores)
-        obs = pool.map(self._get_obs, self.agents.values())
+        if only_view:
+            obs = pool.map(self._get_obs, self.agents.values())
+        else:
+            obs = pool.map(self._get_all, self.agents.values())
         pool.close()
-        #batch_obs = []
-        #for i in range(int(np.ceil(1.*len(self.agents)/self.batch_size))):
-        #    st = self.batch_size * i
-        #    ed = st + self.batch_size
-        #    batch_obs.append(obs[st:ed])
         return obs
 
     def reset(self):
@@ -545,10 +551,9 @@ class SimplePopulationDynamics(BaseEnv):
         self.take_actions(actions)
         rewards = {}
 
- #       for agent in self.agents.values():
- #           rewards[agent.id] = self.get_reward(agent)
         obs, rewards, killed = zip(*self.render())
         self.killed = killed
-        return obs, rewards
+        return obs, dict(rewards)
+
 
 

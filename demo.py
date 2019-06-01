@@ -1,9 +1,9 @@
 import os
 import numpy as np
 from attrdict import AttrDict
-#from garl_gym.scenarios.simple_population_dynamics import SimplePopulationDynamics
+from garl_gym.scenarios.simple_population_dynamics import SimplePopulationDynamics
 #from garl_gym.scenarios.simple_population_dynamics_ga import SimplePopulationDynamicsGA
-from garl_gym.scenarios.simple_population_dynamics_fast import SimplePopulationDynamics
+#from garl_gym.scenarios.simple_population_dynamics_fast import SimplePopulationDynamics
 import matplotlib.pyplot as plt
 import seaborn as sns
 import cv2

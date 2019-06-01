@@ -408,6 +408,7 @@ class SimplePopulationDynamics(BaseEnv):
 
         min_dist = np.inf
         target_prey = None
+        killed_id = None
         for (local_x, local_y) in zip(id_prey_loc[0], id_prey_loc[1]):
             candidate_agent = self.agents[local_map[local_x, local_y]]
             if not candidate_agent.predator:
@@ -420,20 +421,20 @@ class SimplePopulationDynamics(BaseEnv):
             reward += 1
             target_prey.dead = True
             agent.max_reward += 1
-            self.increase_health(agent)
+            killed_id = target_prey.id
         elif agent.health <= 0:
             reward -= 1
         #else:
         #    reward -= 1
-        return ((agent.id, reward), target_prey)
+        return ((agent.id, reward), (agent.id, killed_id))
 
     def get_prey_reward(self, agent):
         reward = 0
         if agent.dead:
             reward -= 1
         else:
-            reward += 0.1
-        return ((agent.id, reward), None)
+            reward += 1
+        return ((agent.id, reward), (agent.id, None))
 
     def get_reward(self, agent):
         if agent.predator:
@@ -457,7 +458,7 @@ class SimplePopulationDynamics(BaseEnv):
                 killed.append(agent.id)
                 x, y = agent.pos
                 self.map[x][y] = 0
-            elif agent.dead:
+            elif agent.id in self.killed:
                 # change this later
                 killed.append(agent.id)
                 del self.preys[agent.id]
@@ -467,6 +468,7 @@ class SimplePopulationDynamics(BaseEnv):
             else:
                 agent.age += 1
                 agent.crossover=False
+        self.killed = []
         return killed
 
     def _get_obs(self, agent):
@@ -475,6 +477,7 @@ class SimplePopulationDynamics(BaseEnv):
         new_x = x - self.vision_width//2 + np.arange(self.vision_width)
         new_y = y - self.vision_height//2 + np.arange(self.vision_height)
         local_map = self.map[(x-self.vision_width//2):(x-self.vision_width//2+self.vision_width), (y-self.vision_height//2):(y-self.vision_height//2+self.vision_height)]
+        obs[4:, self.vision_width//2, self.vision_height//2] = self.agent_embeddings[agent.id]
 
         object_indice = np.where(local_map != 0)
         for object_x, object_y in zip(object_indice[0], object_indice[1]):
@@ -482,7 +485,6 @@ class SimplePopulationDynamics(BaseEnv):
                 other_agent = self.agents[local_map[object_x, object_y]]
                 agent_id = other_agent.id
 
-                obs[4:, object_x, object_y] = self.agent_embeddings[agent_id]
 
                 obs[:0, object_x, object_y] = other_agent.property[1][0]
                 obs[:1, object_x, object_y] = other_agent.property[1][1]
@@ -505,14 +507,13 @@ class SimplePopulationDynamics(BaseEnv):
         new_x = x - self.vision_width//2 + np.arange(self.vision_width)
         new_y = y - self.vision_height//2 + np.arange(self.vision_height)
         local_map = self.map[(x-self.vision_width//2):(x-self.vision_width//2+self.vision_width), (y-self.vision_height//2):(y-self.vision_height//2+self.vision_height)]
+        obs[4:, self.vision_width//2, self.vision_height//2] = self.agent_embeddings[agent.id]
 
         object_indice = np.where(local_map != 0)
         for object_x, object_y in zip(object_indice[0], object_indice[1]):
             if local_map[object_x, object_y] > 0:
                 other_agent = self.agents[local_map[object_x, object_y]]
                 agent_id = other_agent.id
-
-                obs[4:, object_x, object_y] = self.agent_embeddings[agent_id]
 
                 obs[:0, object_x, object_y] = other_agent.property[1][0]
                 obs[:1, object_x, object_y] = other_agent.property[1][1]
@@ -529,6 +530,7 @@ class SimplePopulationDynamics(BaseEnv):
             return (agent.id, obs.reshape(-1)), rewards, killed
         else:
             return (agent.id, obs), rewards, killed
+
     def remove_dead_agent_emb(self, dead_list):
         for id in dead_list:
             del self.agent_embeddings[id]
@@ -549,12 +551,16 @@ class SimplePopulationDynamics(BaseEnv):
         self.make_world(wall_prob=self.args.wall_prob, wall_seed=self.args.wall_seed, food_prob=self.args.food_prob)
 
         return self.render
+
     def step(self, actions):
         self.take_actions(actions)
         rewards = {}
 
         obs, rewards, killed = zip(*self.render())
-        self.killed = killed
+        self.killed = list(dict(killed).values())
+        for id, killed in killed:
+            if killed is not None:
+                self.increase_health(self.agents[id])
         return obs, dict(rewards)
 
 
