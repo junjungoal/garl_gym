@@ -80,6 +80,8 @@ class SimplePopulationDynamicsGA(BaseEnv):
         self.agent_embeddings = {}
         self.agent_emb_dim = args.agent_emb_dim
 
+        self.cpu_cores = args.cpu_cores
+
 
     #@property
     #def predators(self):
@@ -575,7 +577,10 @@ class SimplePopulationDynamicsGA(BaseEnv):
 
 
     def render(self, only_view=False):
-        cores = mp.cpu_count()
+        if self.cpu_cores is None:
+            cores = mp.cpu_count()
+        else:
+            cores = self.cpu_cores
         pool = mp.Pool(processes=cores)
         if only_view:
             obs = pool.map(self._get_obs, self.agents.values())
