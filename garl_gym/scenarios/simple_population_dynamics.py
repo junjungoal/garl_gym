@@ -544,13 +544,14 @@ class SimplePopulationDynamics(BaseEnv):
         else:
             obs = pool.map(self._get_all, self.agents.values())
         pool.close()
+        pool.join()
         return obs
 
     def reset(self):
         self.__init__(self.args)
         self.make_world(wall_prob=self.args.wall_prob, wall_seed=self.args.wall_seed, food_prob=self.args.food_prob)
 
-        return self.render
+        return self.render()
 
     def step(self, actions):
         self.take_actions(actions)

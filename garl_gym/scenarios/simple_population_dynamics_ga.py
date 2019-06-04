@@ -582,6 +582,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
         else:
             obs = pool.map(self._get_all, self.agents.values())
         pool.close()
+        pool.join()
         return obs
 
     def reset(self):
