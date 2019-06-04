@@ -1,8 +1,8 @@
 import os
 import numpy as np
 from attrdict import AttrDict
-from garl_gym.scenarios.simple_population_dynamics import SimplePopulationDynamics
-#from garl_gym.scenarios.simple_population_dynamics_ga import SimplePopulationDynamicsGA
+#from garl_gym.scenarios.simple_population_dynamics import SimplePopulationDynamics
+from garl_gym.scenarios.simple_population_dynamics_ga import SimplePopulationDynamicsGA
 #from garl_gym.scenarios.simple_population_dynamics_fast import SimplePopulationDynamics
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -16,7 +16,7 @@ args = {'agent_emb_dim': 5, 'obs_type': 'dense', 'predator_num': 500, 'prey_num'
         #'width': 70, 'batch_size': 1, 'view_args': ['2500-5-5-0','2500-5-5-1','2500-5-5-2','']}
 args = AttrDict(args)
 
-env = SimplePopulationDynamics(args)
+env = SimplePopulationDynamicsGA(args)
 env.make_world(wall_prob=0.02, wall_seed=20, food_prob=0)
 #env.plot_map()
 
@@ -34,7 +34,7 @@ def take_actions(env):
     return actions
 
 
-for i in range(2):
+for i in range(10):
     print('Iteration: {:d} #Preys {:d} #Predators {:d} #food {:d}'.format(i, len(env.preys), len(env.predators), env.num_food))
     if i % 10 == 0:
         predators.append(len(env.predators))
@@ -58,14 +58,10 @@ for i in range(2):
  #   elif len(env.preys)<2:
  #       env.increase_prey(0.0001)
 
-    #env.crossover_prey(crossover_rate=0.01)
-    #env.crossover_predator(crossover_rate=0.01)
-#    env.increase_prey(0.06)
-#    env.increase_predator(0.002)
-    #env.crossover_preys(crossover_rate=0.05)
-    #env.crossover_predators(crossover_rate=0.05)
-    env.increase_prey(0.006)
-    env.increase_predator(0.003)
+    env.crossover_prey(crossover_rate=0.01)
+    env.crossover_predator(crossover_rate=0.01)
+    #env.increase_prey(0.006)
+    #env.increase_predator(0.003)
     #env.increase_food(prob=0.005)
 
 sns.set_style("darkgrid")
