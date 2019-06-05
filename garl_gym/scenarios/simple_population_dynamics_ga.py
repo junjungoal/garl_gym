@@ -452,10 +452,10 @@ class SimplePopulationDynamicsGA(BaseEnv):
             agent.max_reward += 1
             killed_id = target_prey.id
             self.increase_health(agent)
+        else:
+            reward -= 1
         if agent.health <= 0:
             reward -= 1
-        #else:
-        #    reward -= 0.1
 
         if agent.crossover:
             reward += 1
@@ -465,7 +465,6 @@ class SimplePopulationDynamicsGA(BaseEnv):
         reward = 0
         if agent.dead:
             reward -= 1
-        #else:
         if not agent.dead:
             reward += 1
 
