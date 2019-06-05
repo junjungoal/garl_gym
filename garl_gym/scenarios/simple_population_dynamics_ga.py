@@ -226,13 +226,13 @@ class SimplePopulationDynamicsGA(BaseEnv):
                 self.food_map[x][y] = -2
                 self.num_food += 1
 
-    def crossover_predator(self, mate_scope=3, crossover_rate=0.001):
+    def crossover_predator(self, crossover_scope=3, crossover_rate=0.001):
         ind = np.where(self.map == 0)
         perm = np.random.permutation(np.arange(len(ind[0])))
         index = 0
         for predator in list(self.predators.values()):
             x, y = predator.pos
-            local_map = self.map[(x-mate_scope//2):(x-mate_scope//2+mate_scope), (y-mate_scope//2):(y-mate_scope//2+mate_scope)]
+            local_map = self.map[(x-crossover_scope//2):(x-crossover_scope//2+crossover_scope), (y-crossover_scope//2):(y-crossover_scope//2+crossover_scope)]
             agent_indice = np.where(local_map > 0)
             if len(agent_indice[0]) == 0 or predator.crossover:
                 continue
@@ -262,13 +262,13 @@ class SimplePopulationDynamicsGA(BaseEnv):
                         self.predators[child.id] = child
                         self.predator_num += 1
 
-    def crossover_prey(self, mate_scope=3, crossover_rate=0.001):
+    def crossover_prey(self, crossover_scope=3, crossover_rate=0.001):
         ind = np.where(self.map == 0)
         perm = np.random.permutation(np.arange(len(ind[0])))
         index = 0
         for prey in list(self.preys.values()):
             x, y = prey.pos
-            local_map = self.map[(x-mate_scope//2):(x-mate_scope//2+mate_scope), (y-mate_scope//2):(y-mate_scope//2+mate_scope)]
+            local_map = self.map[(x-crossover_scope//2):(x-crossover_scope//2+crossover_scope), (y-crossover_scope//2):(y-crossover_scope//2+crossover_scope)]
             agent_indice = np.where(local_map > 0)
             if len(agent_indice[0]) == 0 and not prey.crossover:
                 continue
