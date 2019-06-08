@@ -536,7 +536,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
 
 
         if self.obs_type == 'dense':
-            return (agent.id, obs.reshape(-1))
+            return (agent.id, obs[:4].reshape(-1))
         else:
             return (agent.id, obs)
 
@@ -567,7 +567,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
         rewards, killed = self.get_reward(agent)
 
         if self.obs_type == 'dense':
-            return (agent.id, obs.reshape(-1)), rewards, killed
+            return (agent.id, obs[:4].reshape(-1)), rewards, killed
         else:
             return (agent.id, obs), rewards, killed
 
