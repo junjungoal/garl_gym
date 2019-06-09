@@ -178,8 +178,8 @@ class SimplePopulationDynamicsGA(BaseEnv):
     def _init_property(self):
         self.property[-3] = [1, [1, 0, 0]]
         self.property[-2] = [1, [0, 1, 0]]
-        self.property[-1] = [1, [0, 0, 0]]
-        self.property[0] = [1, [0.411, 0.411, 0.411]]
+        self.property[-1] = [1, [0.411, 0.411, 0.411]]
+        self.property[0] = [1, [0, 0, 0]]
 
     def _gen_power(self, cnt):
         def max_view_size(view_size1, view_size2):
@@ -404,7 +404,9 @@ class SimplePopulationDynamicsGA(BaseEnv):
             for j in range(self.w):
                 id = self.map[i][j]
                 if self.food_map[i][j] == -2: img[(i*length-1):(i+1)*length, (j*length-1):(j+1)*length, :] = 255*np.array(self.property[-2][1])
-                elif id <= 0 and id > -2:
+                elif id == 0:
+                    img[(i*length-1):(i+1)*length, (j*length-1):(j+1)*length, :] = 255
+                elif id == -1:
                     img[(i*length-1):(i+1)*length, (j*length-1):(j+1)*length, :] = 255*np.array(self.property[id][1])
                 else:
                     # prey
@@ -424,7 +426,9 @@ class SimplePopulationDynamicsGA(BaseEnv):
                 id = self.map[i][j]
                 if self.food_map[i][j] == -2:
                     img[i, j, :] = 255*np.array(self.property[-2][1])
-                elif id <= 0 and id > -2:
+                elif id == 0:
+                    img[i, j, :] = 255
+                elif id == -1:
                     img[i, j, :] = 255*np.array(self.property[id][1])
                 else:
                     # prey
@@ -537,10 +541,30 @@ class SimplePopulationDynamicsGA(BaseEnv):
 
         x_offset = 0
         y_offset = 0
+
         if x-self.vision_width//2 < 0:
             x_offset = -(x-self.vision_width//2)
+            obs[0, :x_offset] = self.property[-1][1][0]
+            obs[1, :x_offset] = self.property[-1][1][1]
+            obs[2, :x_offset] = self.property[-1][1][2]
+
         if y-self.vision_height//2 < 0:
             y_offset = -(y-self.vision_height//2)
+            obs[0, :, :y_offset] = self.property[-1][1][0]
+            obs[1, :, :y_offset] = self.property[-1][1][1]
+            obs[2, :, :y_offset] = self.property[-1][1][2]
+
+        if x-self.vision_width//2+self.vision_width > self.w:
+            right_offset = (x-self.vision_width//2+self.vision_width - self.w)
+            obs[0, -right_offset:] = self.property[-1][1][0]
+            obs[1, -right_offset:] = self.property[-1][1][1]
+            obs[2, -right_offset:] = self.property[-1][1][2]
+
+        if y-self.vision_height//2+self.vision_height > self.h:
+            bottom_offset = (y-self.vision_height//2+self.vision_height - self.h)
+            obs[0, :, -bottom_offset:] = self.property[-1][1][0]
+            obs[1, :, -bottom_offset:] = self.property[-1][1][1]
+            obs[2, :, -bottom_offset:] = self.property[-1][1][2]
 
         for object_x, object_y in zip(object_indice[0], object_indice[1]):
             if local_map[object_x, object_y] > 0:
@@ -549,18 +573,16 @@ class SimplePopulationDynamicsGA(BaseEnv):
                 object_x += x_offset
                 object_y += y_offset
 
-                obs[4:, object_x, object_y] = self.agent_embeddings[agent_id]
-
                 obs[:0, object_x, object_y] = other_agent.property[1][0]
-                obs[:1, object_x, object_y] = other_agent.property[1][1]
-                obs[:2, object_x, object_y] = other_agent.property[1][2]
+                obs[1, object_x, object_y] = other_agent.property[1][1]
+                obs[2, object_x, object_y] = other_agent.property[1][2]
                 obs[3, object_x, object_y] = other_agent.health
             elif local_map[object_x, object_y] == -1:
                 object_x += x_offset
                 object_y += y_offset
-                obs[:0, object_x, object_y] = self.property[-1][1][0]
-                obs[:1, object_x, object_y] = self.property[-1][1][1]
-                obs[:2, object_x, object_y] = self.property[-1][1][2]
+                obs[0, object_x, object_y] = self.property[-1][1][0]
+                obs[1, object_x, object_y] = self.property[-1][1][1]
+                obs[2, object_x, object_y] = self.property[-1][1][2]
 
 
         if self.obs_type == 'dense':
@@ -586,8 +608,28 @@ class SimplePopulationDynamicsGA(BaseEnv):
         y_offset = 0
         if x-self.vision_width//2 < 0:
             x_offset = -(x-self.vision_width//2)
+            obs[0, :x_offset] = self.property[-1][1][0]
+            obs[1, :x_offset] = self.property[-1][1][1]
+            obs[2, :x_offset] = self.property[-1][1][2]
+
         if y-self.vision_height//2 < 0:
             y_offset = -(y-self.vision_height//2)
+            obs[0, :, :y_offset] = self.property[-1][1][0]
+            obs[1, :, :y_offset] = self.property[-1][1][1]
+            obs[2, :, :y_offset] = self.property[-1][1][2]
+
+        if x-self.vision_width//2+self.vision_width > self.w:
+            right_offset = (x-self.vision_width//2+self.vision_width - self.w)
+            obs[0, -right_offset:] = self.property[-1][1][0]
+            obs[1, -right_offset:] = self.property[-1][1][1]
+            obs[2, -right_offset:] = self.property[-1][1][2]
+
+        if y-self.vision_height//2+self.vision_height > self.h:
+            bottom_offset = (y-self.vision_height//2+self.vision_height - self.h)
+            obs[0, :, -bottom_offset:] = self.property[-1][1][0]
+            obs[1, :, -bottom_offset:] = self.property[-1][1][1]
+            obs[2, :, -bottom_offset:] = self.property[-1][1][2]
+
 
         for object_x, object_y in zip(object_indice[0], object_indice[1]):
             if local_map[object_x, object_y] > 0:
@@ -597,16 +639,16 @@ class SimplePopulationDynamicsGA(BaseEnv):
                 object_x += x_offset
                 object_y += y_offset
 
-                obs[:0, object_x, object_y] = other_agent.property[1][0]
-                obs[:1, object_x, object_y] = other_agent.property[1][1]
-                obs[:2, object_x, object_y] = other_agent.property[1][2]
+                obs[0, object_x, object_y] = other_agent.property[1][0]
+                obs[1, object_x, object_y] = other_agent.property[1][1]
+                obs[2, object_x, object_y] = other_agent.property[1][2]
                 obs[3, object_x, object_y] = other_agent.health
             elif local_map[object_x, object_y] == -1:
                 object_x += x_offset
                 object_y += y_offset
-                obs[:0, object_x, object_y] = self.property[-1][1][0]
-                obs[:1, object_x, object_y] = self.property[-1][1][1]
-                obs[:2, object_x, object_y] = self.property[-1][1][2]
+                obs[0, object_x, object_y] = self.property[-1][1][0]
+                obs[1, object_x, object_y] = self.property[-1][1][1]
+                obs[2, object_x, object_y] = self.property[-1][1][2]
 
         rewards, killed = self.get_reward(agent)
 
