@@ -390,7 +390,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
         agent.health -= self.args.damage_per_step
 
     def increase_health(self, agent):
-        if hasattr(self.args, 'health_increase_rate') and self.args.health_increase_rate is not none:
+        if hasattr(self.args, 'health_increase_rate') and self.args.health_increase_rate is not None:
             agent.health += self.args.health_increase_rate
         else:
             agent.health += 1.
