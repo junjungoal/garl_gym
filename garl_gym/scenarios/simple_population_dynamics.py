@@ -122,7 +122,7 @@ class SimplePopulationDynamics(BaseEnv):
                 agent.predator = True
                 agent.id = self.max_id
                 agent.speed = 1
-                agent.hunt_square = 2
+                agent.hunt_square = self.max_hunt_square
                 agent.property = [self._gen_power(i+1), [0, 0, 1]]
             else:
                 agent.predator = False
@@ -406,10 +406,13 @@ class SimplePopulationDynamics(BaseEnv):
         return img
 
     def get_predator_reward(self, agent):
-        preys = self.preys
         reward = 0
         x, y = agent.pos
-        local_map = self.map[x-agent.hunt_square-1:x+agent.hunt_square, y-agent.hunt_square-1:y+agent.hunt_square]
+        left = np.maximum(x-agent.hunt_square//2, 0)
+        right = np.minimum(x-agent.hunt_square//2+agent.hunt_square, self.w)
+        top = np.maximum(y-agent.hunt_square//2, 0)
+        bottom = np.minimum(y-agent.hunt_square//2+agent.hunt_square, self.h)
+        local_map = self.map[left:right, top:bottom]
         id_prey_loc = np.where(local_map > 0)
 
         min_dist = np.inf
@@ -428,18 +431,25 @@ class SimplePopulationDynamics(BaseEnv):
             target_prey.dead = True
             agent.max_reward += 1
             killed_id = target_prey.id
-        elif agent.health <= 0:
-            reward -= 1
         #else:
         #    reward -= 1
+        if agent.health <= 0:
+            reward -= 1
+
+        if agent.crossover:
+            reward += 1
         return ((agent.id, reward), (agent.id, killed_id))
 
     def get_prey_reward(self, agent):
         reward = 0
         if agent.dead:
             reward -= 1
-        else:
+        #if not agent.dead:
+        #    reward += 1
+
+        if agent.crossover:
             reward += 1
+
         return ((agent.id, reward), (agent.id, None))
 
     def get_reward(self, agent):
@@ -640,10 +650,12 @@ class SimplePopulationDynamics(BaseEnv):
     def reset(self):
         self.__init__(self.args)
         self.make_world(wall_prob=self.args.wall_prob, wall_seed=self.args.wall_seed, food_prob=self.args.food_prob)
+        self.agent_embeddings = {}
 
         return self.render()
 
     def step(self, actions):
+        self.timestep += 1
         self.take_actions(actions)
         rewards = {}
 

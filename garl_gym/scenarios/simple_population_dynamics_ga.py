@@ -682,6 +682,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
             else:
                 for agent in self.agents.values():
                     obs.append(self._get_all(agent))
+            self.agent_embeddings = {}
         return obs
 
     def reset(self):
