@@ -371,9 +371,10 @@ class SimplePopulationDynamics(BaseEnv):
         for i in range(self.h):
             for j in range(self.w):
                 id = self.map[i][j]
-                if self.food_map[i][j] == -2:
-                    img[(i*length-1):(i+1)*length, (j*length-1):(j+1)*length, :] = 255*np.array(self.property[-2][1])
-                elif id <= 0 and id > -2:
+                if self.food_map[i][j] == -2: img[(i*length-1):(i+1)*length, (j*length-1):(j+1)*length, :] = 255*np.array(self.property[-2][1])
+                elif id == 0:
+                    img[(i*length-1):(i+1)*length, (j*length-1):(j+1)*length, :] = 255
+                elif id == -1:
                     img[(i*length-1):(i+1)*length, (j*length-1):(j+1)*length, :] = 255*np.array(self.property[id][1])
                 else:
                     # prey
