@@ -241,7 +241,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
             for (local_x, local_y) in zip(agent_indice[0], agent_indice[1]):
                 candidate_id = local_map[local_x, local_y]
                 candidate_agent = self.agents[candidate_id]
-                if candidate_agent.predator and not candidate_agent.crossover:
+                if candidate_agent.predator and not candidate_agent.crossover and predator.id != candidate_agent.id:
                     if np.random.rand() < crossover_rate:
                         candidate_agent.crossover = True
                         predator.crossover = True
@@ -281,7 +281,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
             for (local_x, local_y) in zip(agent_indice[0], agent_indice[1]):
                 candidate_id = local_map[local_x, local_y]
                 candidate_agent = self.agents[candidate_id]
-                if not candidate_agent.predator and not candidate_agent.crossover:
+                if not candidate_agent.predator and not candidate_agent.crossover and candidate_agent.id != prey.id:
                     if np.random.rand() < crossover_rate:
                         candidate_agent.crossover = True
                         prey.crossover = True
