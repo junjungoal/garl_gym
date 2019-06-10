@@ -660,19 +660,28 @@ class SimplePopulationDynamicsGA(BaseEnv):
         for id in dead_list:
             del self.agent_embeddings[id]
 
-
     def render(self, only_view=False):
         if self.cpu_cores is None:
             cores = mp.cpu_count()
         else:
             cores = self.cpu_cores
-        pool = mp.Pool(processes=cores)
-        if only_view:
-            obs = pool.map(self._get_obs, self.agents.values())
+
+        if self.args.multiprocessing:
+            pool = mp.Pool(processes=cores)
+            if only_view:
+                obs = pool.map(self._get_obs, self.agents.values())
+            else:
+                obs = pool.map(self._get_all, self.agents.values())
+            pool.close()
+            pool.join()
         else:
-            obs = pool.map(self._get_all, self.agents.values())
-        pool.close()
-        pool.join()
+            obs = []
+            if only_view:
+                for agent in self.agents.values():
+                    obs.append(self._get_obs(agent))
+            else:
+                for agent in self.agents.values():
+                    obs.append(self._get_all(agent))
         return obs
 
     def reset(self):
