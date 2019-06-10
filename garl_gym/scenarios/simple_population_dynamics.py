@@ -358,7 +358,10 @@ class SimplePopulationDynamics(BaseEnv):
         agent.health -= self.args.damage_per_step
 
     def increase_health(self, agent):
-        agent.health += 4
+        if hasattr(self.args, 'health_increase_rate') and self.args.health_increase_rate is not none:
+            agent.health += self.args.health_increase_rate
+        else:
+            agent.health += 1.
 
 
     def dump_image(self, img_name):
