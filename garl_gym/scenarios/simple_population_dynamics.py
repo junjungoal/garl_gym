@@ -522,7 +522,7 @@ class SimplePopulationDynamics(BaseEnv):
                 object_x += x_offset
                 object_y += y_offset
 
-                obs[:0, object_x, object_y] = other_agent.property[1][0]
+                obs[0, object_x, object_y] = other_agent.property[1][0]
                 obs[1, object_x, object_y] = other_agent.property[1][1]
                 obs[2, object_x, object_y] = other_agent.property[1][2]
                 obs[3, object_x, object_y] = other_agent.health
