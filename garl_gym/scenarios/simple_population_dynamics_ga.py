@@ -390,10 +390,10 @@ class SimplePopulationDynamicsGA(BaseEnv):
         agent.health -= self.args.damage_per_step
 
     def increase_health(self, agent):
-        if hasattr(self.args, 'health_increase_rte'):
+        if hasattr(self.args, 'health_increase_rate'):
             agent.health += self.args.health_increase_rate
         else:
-            agent.health += 4.
+            agent.health += 1.
 
 
     def dump_image(self, img_name):
