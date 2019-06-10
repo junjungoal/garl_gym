@@ -456,7 +456,6 @@ class SimplePopulationDynamicsGA(BaseEnv):
         killed_id = None
         for (local_x, local_y) in zip(id_prey_loc[0], id_prey_loc[1]):
             candidate_agent = self.agents[local_map[local_x, local_y]]
-            #print(candidate_agent.id, candidate_agent.predator)
             if not candidate_agent.predator:
                 x_prey, y_prey = candidate_agent.pos
                 dist = np.sqrt((x-x_prey)**2+(y-y_prey)**2)
@@ -468,8 +467,8 @@ class SimplePopulationDynamicsGA(BaseEnv):
             target_prey.dead = True
             agent.max_reward += 1
             killed_id = target_prey.id
-        else:
-            reward -= 1
+        #else:
+        #    reward -= 1
         if agent.health <= 0:
             reward -= 1
 
@@ -481,8 +480,8 @@ class SimplePopulationDynamicsGA(BaseEnv):
         reward = 0
         if agent.dead:
             reward -= 1
-        if not agent.dead:
-            reward += 1
+        #if not agent.dead:
+        #    reward += 1
 
         if agent.crossover:
             reward += 1
@@ -573,7 +572,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
                 object_x += x_offset
                 object_y += y_offset
 
-                obs[:0, object_x, object_y] = other_agent.property[1][0]
+                obs[0, object_x, object_y] = other_agent.property[1][0]
                 obs[1, object_x, object_y] = other_agent.property[1][1]
                 obs[2, object_x, object_y] = other_agent.property[1][2]
                 obs[3, object_x, object_y] = other_agent.health
