@@ -488,24 +488,39 @@ class SimplePopulationDynamicsGA(BaseEnv):
     def get_predator_reward(self, agent):
         reward = 0
         x, y = agent.pos
-        left = np.maximum(x-agent.hunt_square//2, 0)
-        right = np.minimum(x-agent.hunt_square//2+agent.hunt_square, self.w)
-        top = np.maximum(y-agent.hunt_square//2, 0)
-        bottom = np.minimum(y-agent.hunt_square//2+agent.hunt_square, self.h)
-        local_map = self.map[left:right, top:bottom]
-        id_prey_loc = np.where(local_map > 0)
-
         min_dist = np.inf
         target_prey = None
         killed_id = None
-        for (local_x, local_y) in zip(id_prey_loc[0], id_prey_loc[1]):
-            candidate_agent = self.agents[local_map[local_x, local_y]]
-            if not candidate_agent.predator:
-                x_prey, y_prey = candidate_agent.pos
-                dist = np.sqrt((x-x_prey)**2+(y-y_prey)**2)
-                if dist < min_dist:
-                    min_dist = dist
-                    target_prey = candidate_agent
+
+        hunt_x = x-agent.hunt_square//2
+        hunt_y = y-agent.hunt_square//2
+
+        if hunt_x < 0:
+            hunt_x = self.w+hunt_x
+        if hunt_y < 0:
+            hunt_y = self.h+hunt_y
+
+        for i in range(agent.hunt_square):
+            for j in range(agent.hunt_square):
+                x_coord = hunt_x + i
+                y_coord = hunt_y + j
+                if x_coord < 0:
+                    x_coord = self.w+x_coord
+                if y_coord < 0:
+                    y_coord = self.h+y_coord
+
+                if x_coord >= self.w:
+                    x_coord = x_coord - self.w
+                if y_coord >= self.h:
+                    y_coord = y_coord - self.h
+                if self.map[x_coord][y_coord] > 0:
+                    candidate_agent = self.agents[self.map[x_coord, y_coord]]
+                    if not candidate_agent.predator:
+                        x_prey, y_prey = candidate_agent.pos
+                        dist = np.sqrt((x-x_prey)**2+(y-y_prey)**2)
+                        if dist < min_dist:
+                            min_dist = dist
+                            target_prey = candidate_agent
         if target_prey is not None:
             reward += 1
             target_prey.dead = True
