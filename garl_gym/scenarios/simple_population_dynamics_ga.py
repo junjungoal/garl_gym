@@ -168,12 +168,27 @@ class SimplePopulationDynamicsGA(BaseEnv):
 
         for i in range(self.h):
             for j in range(self.w):
-                if i == 0 or i == self.h-1 or j == 0 or j == self.w - 1:
-                    self.map[i][j] = -1
-                    continue
+                #if i == 0 or i == self.h-1 or j == 0 or j == self.w - 1:
+                #    self.map[i][j] = -1
+                #    continue
                 wall_prob = np.random.rand()
+                buffer = []
+                connected_wall = []
                 if wall_prob < prob:
-                    self.map[i][j] = -1
+                    #self.map[i][j] = -1
+                    buffer.append((i, j))
+                    connected_wall.append((i, j))
+
+                    while len(buffer) != 0:
+                        coord = buffer.pop()
+                        for x, y in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
+                                if np.random.rand() < 0.15 and coord[0]+x>=0 and coord[0]+x<=self.h-1 and coord[1]+y>=0 and coord[1]+y<=self.w-1:
+                                    buffer.append((coord[0]+x, coord[1]+y))
+                                    connected_wall.append((coord[0]+x, coord[1]+y))
+                                    self.map[coord[0]+x][coord[1]+y] = -1
+                    if len(connected_wall) > 1:
+                        for (x, y) in connected_wall:
+                            self.map[x][y] = -1
 
     def _init_property(self):
         self.property[-3] = [1, [1, 0, 0]]
@@ -321,20 +336,36 @@ class SimplePopulationDynamicsGA(BaseEnv):
             new_y = y
             if in_board(new_x, new_y):
                 agent.pos = (new_x, new_y)
+            else:
+                new_x = self.h-1
+                new_y = y
+                agent.pos = (new_x, new_y)
         elif action == 1:
             new_x = x + 1
             new_y = y
             if in_board(new_x, new_y):
+                agent.pos = (new_x, new_y)
+            else:
+                new_x = 0
+                new_y = y
                 agent.pos = (new_x, new_y)
         elif action == 2:
             new_x = x
             new_y = y - 1
             if in_board(new_x, new_y):
                 agent.pos = (new_x, new_y)
+            else:
+                new_x = x
+                new_y = self.w-1
+                agent.pos = (new_x, new_y)
         elif action == 3:
             new_x = x
             new_y = y + 1
             if in_board(new_x, new_y):
+                agent.pos = (new_x, new_y)
+            else:
+                new_x = x
+                new_y = 0
                 agent.pos = (new_x, new_y)
         else:
             print('Wrong action id')
@@ -342,11 +373,6 @@ class SimplePopulationDynamicsGA(BaseEnv):
         new_x, new_y = agent.pos
         self.map[x][y] = 0
         self.map[new_x][new_y] = agent.id
-        if self.food_map[new_x, new_y] == -2:
-            self.food_map[new_x, new_y] = 0
-            agent.health += 0.1
-            self.num_food -= 1
-
 
 
     def _predator_action(self, agent, action):
@@ -358,20 +384,36 @@ class SimplePopulationDynamicsGA(BaseEnv):
             new_y = y
             if in_board(new_x, new_y):
                 agent.pos = (new_x, new_y)
+            else:
+                new_x = self.h-1
+                new_y = y
+                agent.pos = (new_x, new_y)
         elif action == 1:
             new_x = x + 1
             new_y = y
             if in_board(new_x, new_y):
+                agent.pos = (new_x, new_y)
+            else:
+                new_x = 0
+                new_y = y
                 agent.pos = (new_x, new_y)
         elif action == 2:
             new_x = x
             new_y = y - 1
             if in_board(new_x, new_y):
                 agent.pos = (new_x, new_y)
+            else:
+                new_x = x
+                new_y = self.w-1
+                agent.pos = (new_x, new_y)
         elif action == 3:
             new_x = x
             new_y = y + 1
             if in_board(new_x, new_y):
+                agent.pos = (new_x, new_y)
+            else:
+                new_x = x
+                new_y = 0
                 agent.pos = (new_x, new_y)
         else:
             print('Wrong action id')
@@ -379,6 +421,8 @@ class SimplePopulationDynamicsGA(BaseEnv):
         new_x, new_y = agent.pos
         self.map[x][y] = 0
         self.map[new_x][new_y] = agent.id
+
+
 
 
         ## Exclude Grouping

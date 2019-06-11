@@ -1,7 +1,7 @@
 import os
 import numpy as np
 from attrdict import AttrDict
-#from garl_gym.scenarios.simple_population_dynamics import SimplePopulationDynamics
+from garl_gym.scenarios.simple_population_dynamics import SimplePopulationDynamics
 from garl_gym.scenarios.simple_population_dynamics_ga import SimplePopulationDynamicsGA
 #from garl_gym.scenarios.simple_population_dynamics_fast import SimplePopulationDynamics
 import matplotlib.pyplot as plt
@@ -11,12 +11,12 @@ import cv2
 #args = {'predator_num': 5000, 'prey_num': 10000, 'num_actions': 4, 'height': 1000, 'damage_per_step': 0.01, 'img_length': 5, 'max_hunt_square': 2, 'max_speed': 1, 'max_acceleration': 1,
         #'width': 1000, 'batch_size': 32, 'vision_width': 7, 'vision_height': 7, 'max_health': 1.0, 'min_health': 0.5, 'max_crossover': 3}
 
-args = {'agent_emb_dim': 5, 'obs_type': 'dense', 'predator_num': 1000, 'prey_num': 1000, 'num_actions': 4, 'height':1000, 'damage_per_step': 0.01, 'img_length': 5, 'max_hunt_square': 3, 'max_speed': 1, 'max_acceleration': 1,
-        'width': 1000, 'batch_size': 512, 'vision_width': 7, 'vision_height': 7, 'max_health': 1.0, 'min_health': 0.5, 'max_crossover': 3, 'wall_prob': 0.02, 'wall_seed': 20, 'food_prob': 0, 'cpu_cores': 3, 'multiprocessing': True}
+args = {'agent_emb_dim': 5, 'obs_type': 'dense', 'predator_num': 2, 'prey_num': 2, 'num_actions': 4, 'height':10, 'damage_per_step': 0.01, 'img_length': 5, 'max_hunt_square': 3, 'max_speed': 1, 'max_acceleration': 1,
+        'width': 10, 'batch_size': 512, 'vision_width': 7, 'vision_height': 7, 'max_health': 1.0, 'min_health': 0.5, 'max_crossover': 3, 'wall_prob': 0.05, 'wall_seed': 20, 'food_prob': 0, 'cpu_cores': 3, 'multiprocessing': True}
         #'width': 70, 'batch_size': 1, 'view_args': ['2500-5-5-0','2500-5-5-1','2500-5-5-2','']}
 args = AttrDict(args)
 
-env = SimplePopulationDynamicsGA(args)
+env = SimplePopulationDynamics(args)
 env.make_world(wall_prob=0.02, wall_seed=20, food_prob=0)
 #env.plot_map()
 
@@ -34,7 +34,7 @@ def take_actions(env):
     return actions
 
 
-for i in range(10):
+for i in range(100):
     print('Iteration: {:d} #Preys {:d} #Predators {:d} #food {:d}'.format(i, len(env.preys), len(env.predators), env.num_food))
     if i % 10 == 0:
         predators.append(len(env.predators))
@@ -46,7 +46,7 @@ for i in range(10):
     obs, rewards = env.step(actions)
     #sum_rewards += np.sum(rewards)
     env.remove_dead_agents()
-    #env.plot_map_cv2()
+    env.plot_map_cv2()
     #env.dump_image('./tmp/{:d}.png'.format(i))
     if cv2.waitKey(100) & 0xFF == 27:
         break
@@ -58,10 +58,10 @@ for i in range(10):
  #   elif len(env.preys)<2:
  #       env.increase_prey(0.0001)
 
-    env.crossover_prey(crossover_rate=0.01)
-    env.crossover_predator(crossover_rate=0.01)
-    #env.increase_prey(0.006)
-    #env.increase_predator(0.003)
+    #env.crossover_prey(crossover_rate=0.01)
+    #env.crossover_predator(crossover_rate=0.01)
+    env.increase_prey(0.006)
+    env.increase_predator(0.003)
     #env.increase_food(prob=0.005)
 
 sns.set_style("darkgrid")
