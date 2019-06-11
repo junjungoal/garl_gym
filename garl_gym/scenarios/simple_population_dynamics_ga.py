@@ -585,62 +585,44 @@ class SimplePopulationDynamicsGA(BaseEnv):
     def _get_obs(self, agent):
         x, y = agent.pos
         obs = np.zeros((4+self.agent_emb_dim, self.vision_width, self.vision_height))
-        left = np.maximum(x-self.vision_width//2, 0)
-        right = np.minimum(x-self.vision_width//2+self.vision_width, self.w)
-        top = np.maximum(y-self.vision_height//2, 0)
-        bottom = np.minimum(y-self.vision_height//2+self.vision_height, self.h)
-        local_map = self.map[left:right, top:bottom]
         obs[4:, self.vision_width//2, self.vision_height//2] = self.agent_embeddings[agent.id]
+        vision_x = x-self.vision_width//2
+        vision_y = y-self.vision_height//2
 
-        object_indice = np.where(local_map != 0)
-        local_width, local_height = local_map.shape
-        x_offset = self.vision_width - local_width
-        y_offset = self.vision_height - local_height
+        if vision_x < 0:
+            vision_x = self.w+vision_x
+        if vision_y < 0:
+            vision_y = self.h+vision_y
 
-        x_offset = 0
-        y_offset = 0
+        for i in range(self.vision_width):
+            for j in range(self.vision_height):
+                x_coord = vision_x + i
+                y_coord = vision_y + j
+                if x_coord < 0:
+                    x_coord = self.w+x_coord
+                if y_coord < 0:
+                    y_coord = self.h+y_coord
 
-        if x-self.vision_width//2 < 0:
-            x_offset = -(x-self.vision_width//2)
-            obs[0, :x_offset] = self.property[-1][1][0]
-            obs[1, :x_offset] = self.property[-1][1][1]
-            obs[2, :x_offset] = self.property[-1][1][2]
+                if x_coord >= self.w:
+                    x_coord = x_coord - self.w
+                if y_coord >= self.h:
+                    y_coord = y_coord - self.h
 
-        if y-self.vision_height//2 < 0:
-            y_offset = -(y-self.vision_height//2)
-            obs[0, :, :y_offset] = self.property[-1][1][0]
-            obs[1, :, :y_offset] = self.property[-1][1][1]
-            obs[2, :, :y_offset] = self.property[-1][1][2]
+                if self.map[x_coord][y_coord] > 0:
+                    other_agent = self.agents[self.map[x_coord][y_coord]]
+                    obs[0, i, j] = other_agent.property[1][0]
+                    obs[1, i, j] = other_agent.property[1][1]
+                    obs[2, i, j] = other_agent.property[1][2]
+                    obs[3, i, j] = other_agent.health
+                elif self.map[x_coord][y_coord] == -1: #wall
+                    obs[0, i, j] = 1.
+                    obs[1, i, j] = 1.
+                    obs[2, i, j] = 1.
+                else:
+                    obs[0, i, j] = self.property[0][1][0]
+                    obs[1, i, j] = self.property[0][1][1]
+                    obs[2, i, j] = self.property[0][1][2]
 
-        if x-self.vision_width//2+self.vision_width > self.w:
-            right_offset = (x-self.vision_width//2+self.vision_width - self.w)
-            obs[0, -right_offset:] = self.property[-1][1][0]
-            obs[1, -right_offset:] = self.property[-1][1][1]
-            obs[2, -right_offset:] = self.property[-1][1][2]
-
-        if y-self.vision_height//2+self.vision_height > self.h:
-            bottom_offset = (y-self.vision_height//2+self.vision_height - self.h)
-            obs[0, :, -bottom_offset:] = self.property[-1][1][0]
-            obs[1, :, -bottom_offset:] = self.property[-1][1][1]
-            obs[2, :, -bottom_offset:] = self.property[-1][1][2]
-
-        for object_x, object_y in zip(object_indice[0], object_indice[1]):
-            if local_map[object_x, object_y] > 0:
-                other_agent = self.agents[local_map[object_x, object_y]]
-                agent_id = other_agent.id
-                object_x += x_offset
-                object_y += y_offset
-
-                obs[0, object_x, object_y] = other_agent.property[1][0]
-                obs[1, object_x, object_y] = other_agent.property[1][1]
-                obs[2, object_x, object_y] = other_agent.property[1][2]
-                obs[3, object_x, object_y] = other_agent.health
-            elif local_map[object_x, object_y] == -1:
-                object_x += x_offset
-                object_y += y_offset
-                obs[0, object_x, object_y] = self.property[-1][1][0]
-                obs[1, object_x, object_y] = self.property[-1][1][1]
-                obs[2, object_x, object_y] = self.property[-1][1][2]
 
 
         if self.obs_type == 'dense':
@@ -651,64 +633,50 @@ class SimplePopulationDynamicsGA(BaseEnv):
     def _get_all(self, agent):
         x, y = agent.pos
         obs = np.zeros((4+self.agent_emb_dim, self.vision_width, self.vision_height))
-
-        left = np.maximum(x-self.vision_width//2, 0)
-        right = np.minimum(x-self.vision_width//2+self.vision_width, self.w)
-        top = np.maximum(y-self.vision_height//2, 0)
-        bottom = np.minimum(y-self.vision_height//2+self.vision_height, self.h)
-        local_map = self.map[left:right, top:bottom]
-
         obs[4:, self.vision_width//2, self.vision_height//2] = self.agent_embeddings[agent.id]
+        vision_x = x-self.vision_width//2
+        vision_y = y-self.vision_height//2
 
-        object_indice = np.where(local_map != 0)
+        if vision_x < 0:
+            vision_x = self.w+vision_x
+        if vision_y < 0:
+            vision_y = self.h+vision_y
 
-        x_offset = 0
-        y_offset = 0
-        if x-self.vision_width//2 < 0:
-            x_offset = -(x-self.vision_width//2)
-            obs[0, :x_offset] = self.property[-1][1][0]
-            obs[1, :x_offset] = self.property[-1][1][1]
-            obs[2, :x_offset] = self.property[-1][1][2]
+        for i in range(self.vision_width):
+            for j in range(self.vision_height):
+                x_coord = vision_x + i
+                y_coord = vision_y + j
+                if x_coord < 0:
+                    x_coord = self.w+x_coord
+                if y_coord < 0:
+                    y_coord = self.h+y_coord
 
-        if y-self.vision_height//2 < 0:
-            y_offset = -(y-self.vision_height//2)
-            obs[0, :, :y_offset] = self.property[-1][1][0]
-            obs[1, :, :y_offset] = self.property[-1][1][1]
-            obs[2, :, :y_offset] = self.property[-1][1][2]
+                if x_coord >= self.w:
+                    x_coord = x_coord - self.w
+                if y_coord >= self.h:
+                    y_coord = y_coord - self.h
 
-        if x-self.vision_width//2+self.vision_width > self.w:
-            right_offset = (x-self.vision_width//2+self.vision_width - self.w)
-            obs[0, -right_offset:] = self.property[-1][1][0]
-            obs[1, -right_offset:] = self.property[-1][1][1]
-            obs[2, -right_offset:] = self.property[-1][1][2]
-
-        if y-self.vision_height//2+self.vision_height > self.h:
-            bottom_offset = (y-self.vision_height//2+self.vision_height - self.h)
-            obs[0, :, -bottom_offset:] = self.property[-1][1][0]
-            obs[1, :, -bottom_offset:] = self.property[-1][1][1]
-            obs[2, :, -bottom_offset:] = self.property[-1][1][2]
-
-
-        for object_x, object_y in zip(object_indice[0], object_indice[1]):
-            if local_map[object_x, object_y] > 0:
-                other_agent = self.agents[local_map[object_x, object_y]]
-                agent_id = other_agent.id
-
-                object_x += x_offset
-                object_y += y_offset
-
-                obs[0, object_x, object_y] = other_agent.property[1][0]
-                obs[1, object_x, object_y] = other_agent.property[1][1]
-                obs[2, object_x, object_y] = other_agent.property[1][2]
-                obs[3, object_x, object_y] = other_agent.health
-            elif local_map[object_x, object_y] == -1:
-                object_x += x_offset
-                object_y += y_offset
-                obs[0, object_x, object_y] = self.property[-1][1][0]
-                obs[1, object_x, object_y] = self.property[-1][1][1]
-                obs[2, object_x, object_y] = self.property[-1][1][2]
+                if self.map[x_coord][y_coord] > 0:
+                    other_agent = self.agents[self.map[x_coord][y_coord]]
+                    obs[0, i, j] = other_agent.property[1][0]
+                    obs[1, i, j] = other_agent.property[1][1]
+                    obs[2, i, j] = other_agent.property[1][2]
+                    obs[3, i, j] = other_agent.health
+                elif self.map[x_coord][y_coord] == -1:
+                    obs[0, i, j] = 1.
+                    obs[1, i, j] = 1.
+                    obs[2, i, j] = 1.
+                else:
+                    obs[0, i, j] = self.property[0][1][0]
+                    obs[1, i, j] = self.property[0][1][1]
+                    obs[2, i, j] = self.property[0][1][2]
 
         rewards, killed = self.get_reward(agent)
+
+        if self.obs_type == 'dense':
+            return (agent.id, obs[:4].reshape(-1)), rewards, killed
+        else:
+            return (agent.id, obs), rewards, killed
 
         if self.obs_type == 'dense':
             return (agent.id, obs[:4].reshape(-1)), rewards, killed

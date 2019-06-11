@@ -574,10 +574,15 @@ class SimplePopulationDynamics(BaseEnv):
                     obs[1, i, j] = other_agent.property[1][1]
                     obs[2, i, j] = other_agent.property[1][2]
                     obs[3, i, j] = other_agent.health
-                elif self.map[x_coord][y_coord] == -1:
-                    obs[0, i, j] = self.property[-1][1][0]
-                    obs[1, i, j] = self.property[-1][1][1]
-                    obs[2, i, j] = self.property[-1][1][2]
+                elif self.map[x_coord][y_coord] == -1: #wall
+                    obs[0, i, j] = 1.
+                    obs[1, i, j] = 1.
+                    obs[2, i, j] = 1.
+                else:
+                    obs[0, i, j] = self.property[0][1][0]
+                    obs[1, i, j] = self.property[0][1][1]
+                    obs[2, i, j] = self.property[0][1][2]
+
 
 
         if self.obs_type == 'dense':
@@ -618,9 +623,13 @@ class SimplePopulationDynamics(BaseEnv):
                     obs[2, i, j] = other_agent.property[1][2]
                     obs[3, i, j] = other_agent.health
                 elif self.map[x_coord][y_coord] == -1:
-                    obs[0, i, j] = self.property[-1][1][0]
-                    obs[1, i, j] = self.property[-1][1][1]
-                    obs[2, i, j] = self.property[-1][1][2]
+                    obs[0, i, j] = 1.
+                    obs[1, i, j] = 1.
+                    obs[2, i, j] = 1.
+                else:
+                    obs[0, i, j] = self.property[0][1][0]
+                    obs[1, i, j] = self.property[0][1][1]
+                    obs[2, i, j] = self.property[0][1][2]
 
         rewards, killed = self.get_reward(agent)
 
