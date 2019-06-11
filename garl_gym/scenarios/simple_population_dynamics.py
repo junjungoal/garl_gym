@@ -306,37 +306,41 @@ class SimplePopulationDynamics(BaseEnv):
             new_y = y
             if in_board(new_x, new_y):
                 agent.pos = (new_x, new_y)
-            else:
+            elif new_x < 0:
                 new_x = self.h-1
                 new_y = y
-                agent.pos = (new_x, new_y)
+                if in_board(new_x, new_y):
+                    agent.pos = (new_x, new_y)
         elif action == 1:
             new_x = x + 1
             new_y = y
             if in_board(new_x, new_y):
                 agent.pos = (new_x, new_y)
-            else:
+            elif new_x >= self.h:
                 new_x = 0
                 new_y = y
-                agent.pos = (new_x, new_y)
+                if in_board(new_x, new_y):
+                    agent.pos = (new_x, new_y)
         elif action == 2:
             new_x = x
             new_y = y - 1
             if in_board(new_x, new_y):
                 agent.pos = (new_x, new_y)
-            else:
+            elif new_y < 0:
                 new_x = x
                 new_y = self.w-1
-                agent.pos = (new_x, new_y)
+                if in_board(new_x, new_y):
+                    agent.pos = (new_x, new_y)
         elif action == 3:
             new_x = x
             new_y = y + 1
             if in_board(new_x, new_y):
                 agent.pos = (new_x, new_y)
-            else:
-                new_x = x
+            elif new_y >= self.w:
                 new_y = 0
-                agent.pos = (new_x, new_y)
+                new_x = x
+                if in_board(new_x, new_y):
+                    agent.pos = (new_x, new_y)
         else:
             print('Wrong action id')
 
@@ -442,8 +446,8 @@ class SimplePopulationDynamics(BaseEnv):
             target_prey.dead = True
             agent.max_reward += 1
             killed_id = target_prey.id
-        else:
-            reward -= 0.2
+        #else:
+        #    reward -= 0.2
 
         if agent.health <= 0:
             reward -= 1
@@ -453,8 +457,8 @@ class SimplePopulationDynamics(BaseEnv):
         reward = 0
         if agent.dead:
             reward -= 1
-        else:
-            reward += 0.2
+        #else:
+        #    reward += 0.2
 
         return ((agent.id, reward), (agent.id, None))
 
