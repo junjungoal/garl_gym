@@ -687,6 +687,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
 
     def reset(self):
         self.__init__(self.args)
+        self.agent_embeddings = {}
         self.make_world(wall_prob=self.args.wall_prob, wall_seed=self.args.wall_seed, food_prob=self.args.food_prob)
 
         return self.render

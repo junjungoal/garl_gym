@@ -431,24 +431,19 @@ class SimplePopulationDynamics(BaseEnv):
             target_prey.dead = True
             agent.max_reward += 1
             killed_id = target_prey.id
-        #else:
-        #    reward -= 1
+        else:
+            reward -= 0.2
+
         if agent.health <= 0:
             reward -= 1
-
-        if agent.crossover:
-            reward += 1
         return ((agent.id, reward), (agent.id, killed_id))
 
     def get_prey_reward(self, agent):
         reward = 0
         if agent.dead:
             reward -= 1
-        #if not agent.dead:
-        #    reward += 1
-
-        if agent.crossover:
-            reward += 1
+        else:
+            reward += 0.2
 
         return ((agent.id, reward), (agent.id, None))
 
@@ -649,8 +644,8 @@ class SimplePopulationDynamics(BaseEnv):
 
     def reset(self):
         self.__init__(self.args)
-        self.make_world(wall_prob=self.args.wall_prob, wall_seed=self.args.wall_seed, food_prob=self.args.food_prob)
         self.agent_embeddings = {}
+        self.make_world(wall_prob=self.args.wall_prob, wall_seed=self.args.wall_seed, food_prob=self.args.food_prob)
 
         return self.render()
 
