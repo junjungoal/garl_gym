@@ -292,12 +292,12 @@ class SimplePopulationDynamics(BaseEnv):
     def take_actions(self, actions):
         for id, agent in self.agents.items():
             if agent.predator:
-                self._predator_action(agent, actions[id])
+                self._take_action(agent, actions[id])
                 self.decrease_health(agent)
             else:
-                self._prey_action(agent, actions[id])
+                self._take_action(agent, actions[id])
 
-    def _prey_action(self, agent, action):
+    def _take_action(self, agent, action):
         def in_board(x, y):
             return not (x < 0 or x >= self.h or y < 0 or y >= self.w) and self.map[x][y] == 0
         x, y = agent.pos
@@ -345,59 +345,6 @@ class SimplePopulationDynamics(BaseEnv):
         self.map[new_x][new_y] = agent.id
 
 
-    def _predator_action(self, agent, action):
-        def in_board(x, y):
-            return not (x < 0 or x >= self.h or y < 0 or y >= self.w) and self.map[x][y] == 0
-        x, y = agent.pos
-        if action == 0:
-            new_x = x - 1
-            new_y = y
-            if in_board(new_x, new_y):
-                agent.pos = (new_x, new_y)
-            elif new_x < 0:
-                new_x = self.h-1
-                new_y = y
-                if in_board(new_x, new_y):
-                    agent.pos = (new_x, new_y)
-        elif action == 1:
-            new_x = x + 1
-            new_y = y
-            if in_board(new_x, new_y):
-                agent.pos = (new_x, new_y)
-            elif new_x >= self.h:
-                new_x = 0
-                new_y = y
-                if in_board(new_x, new_y):
-                    agent.pos = (new_x, new_y)
-        elif action == 2:
-            new_x = x
-            new_y = y - 1
-            if in_board(new_x, new_y):
-                agent.pos = (new_x, new_y)
-            elif new_y < 0:
-                new_x = x
-                new_y = self.w-1
-                if in_board(new_x, new_y):
-                    agent.pos = (new_x, new_y)
-        elif action == 3:
-            new_x = x
-            new_y = y + 1
-            if in_board(new_x, new_y):
-                agent.pos = (new_x, new_y)
-            elif new_y >= self.w:
-                new_x = x
-                new_y = 0
-                if in_board(new_x, new_y):
-                    agent.pos = (new_x, new_y)
-        else:
-            print('Wrong action id')
-
-        new_x, new_y = agent.pos
-        self.map[x][y] = 0
-        self.map[new_x][new_y] = agent.id
-
-
-        ## Exclude Grouping
 
     def decrease_health(self, agent):
         #for i in range(self.predator_num):
