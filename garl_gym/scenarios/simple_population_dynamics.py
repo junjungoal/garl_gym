@@ -354,37 +354,41 @@ class SimplePopulationDynamics(BaseEnv):
             new_y = y
             if in_board(new_x, new_y):
                 agent.pos = (new_x, new_y)
-            else:
+            elif new_x < 0:
                 new_x = self.h-1
                 new_y = y
-                agent.pos = (new_x, new_y)
+                if in_board(new_x, new_y):
+                    agent.pos = (new_x, new_y)
         elif action == 1:
             new_x = x + 1
             new_y = y
             if in_board(new_x, new_y):
                 agent.pos = (new_x, new_y)
-            else:
+            elif new_x >= self.h:
                 new_x = 0
                 new_y = y
-                agent.pos = (new_x, new_y)
+                if in_board(new_x, new_y):
+                    agent.pos = (new_x, new_y)
         elif action == 2:
             new_x = x
             new_y = y - 1
             if in_board(new_x, new_y):
                 agent.pos = (new_x, new_y)
-            else:
+            elif new_y < 0:
                 new_x = x
                 new_y = self.w-1
-                agent.pos = (new_x, new_y)
+                if in_board(new_x, new_y):
+                    agent.pos = (new_x, new_y)
         elif action == 3:
             new_x = x
             new_y = y + 1
             if in_board(new_x, new_y):
                 agent.pos = (new_x, new_y)
-            else:
+            elif new_y >= self.w:
                 new_x = x
                 new_y = 0
-                agent.pos = (new_x, new_y)
+                if in_board(new_x, new_y):
+                    agent.pos = (new_x, new_y)
         else:
             print('Wrong action id')
 
