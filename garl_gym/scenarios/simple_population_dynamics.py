@@ -162,12 +162,29 @@ class SimplePopulationDynamics(BaseEnv):
 
         for i in range(self.h):
             for j in range(self.w):
-                if i == 0 or i == self.h-1 or j == 0 or j == self.w - 1:
-                    self.map[i][j] = -1
-                    continue
+                #if i == 0 or i == self.h-1 or j == 0 or j == self.w - 1:
+                #    self.map[i][j] = -1
+                #    continue
                 wall_prob = np.random.rand()
+                buffer = []
+                connected_wall = []
                 if wall_prob < prob:
-                    self.map[i][j] = -1
+                    #self.map[i][j] = -1
+                    buffer.append((i, j))
+                    connected_wall.append((i, j))
+
+                    while len(buffer) != 0:
+                        coord = buffer.pop()
+                        for x, y in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
+                                if np.random.rand() < 0.15 and coord[0]+x>=0 and coord[0]+x<=self.h-1 and coord[1]+y>=0 and coord[1]+y<=self.w-1:
+                                    buffer.append((coord[0]+x, coord[1]+y))
+                                    connected_wall.append((coord[0]+x, coord[1]+y))
+                                    self.map[coord[0]+x][coord[1]+y] = -1
+                    if len(connected_wall) > 1:
+                        for (x, y) in connected_wall:
+                            self.map[x][y] = -1
+
+
 
     def _init_property(self):
         self.property[-3] = [1, [1, 0, 0]]
@@ -289,20 +306,36 @@ class SimplePopulationDynamics(BaseEnv):
             new_y = y
             if in_board(new_x, new_y):
                 agent.pos = (new_x, new_y)
+            else:
+                new_x = self.h-1
+                new_y = y
+                agent.pos = (new_x, new_y)
         elif action == 1:
             new_x = x + 1
             new_y = y
             if in_board(new_x, new_y):
+                agent.pos = (new_x, new_y)
+            else:
+                new_x = 0
+                new_y = y
                 agent.pos = (new_x, new_y)
         elif action == 2:
             new_x = x
             new_y = y - 1
             if in_board(new_x, new_y):
                 agent.pos = (new_x, new_y)
+            else:
+                new_x = x
+                new_y = self.w-1
+                agent.pos = (new_x, new_y)
         elif action == 3:
             new_x = x
             new_y = y + 1
             if in_board(new_x, new_y):
+                agent.pos = (new_x, new_y)
+            else:
+                new_x = x
+                new_y = 0
                 agent.pos = (new_x, new_y)
         else:
             print('Wrong action id')
@@ -310,11 +343,6 @@ class SimplePopulationDynamics(BaseEnv):
         new_x, new_y = agent.pos
         self.map[x][y] = 0
         self.map[new_x][new_y] = agent.id
-        if self.food_map[new_x, new_y] == -2:
-            self.food_map[new_x, new_y] = 0
-            agent.health += 0.1
-            self.num_food -= 1
-
 
 
     def _predator_action(self, agent, action):
@@ -326,20 +354,36 @@ class SimplePopulationDynamics(BaseEnv):
             new_y = y
             if in_board(new_x, new_y):
                 agent.pos = (new_x, new_y)
+            else:
+                new_x = self.h-1
+                new_y = y
+                agent.pos = (new_x, new_y)
         elif action == 1:
             new_x = x + 1
             new_y = y
             if in_board(new_x, new_y):
+                agent.pos = (new_x, new_y)
+            else:
+                new_x = 0
+                new_y = y
                 agent.pos = (new_x, new_y)
         elif action == 2:
             new_x = x
             new_y = y - 1
             if in_board(new_x, new_y):
                 agent.pos = (new_x, new_y)
+            else:
+                new_x = x
+                new_y = self.w-1
+                agent.pos = (new_x, new_y)
         elif action == 3:
             new_x = x
             new_y = y + 1
             if in_board(new_x, new_y):
+                agent.pos = (new_x, new_y)
+            else:
+                new_x = x
+                new_y = 0
                 agent.pos = (new_x, new_y)
         else:
             print('Wrong action id')
@@ -408,24 +452,40 @@ class SimplePopulationDynamics(BaseEnv):
     def get_predator_reward(self, agent):
         reward = 0
         x, y = agent.pos
-        left = np.maximum(x-agent.hunt_square//2, 0)
-        right = np.minimum(x-agent.hunt_square//2+agent.hunt_square, self.w)
-        top = np.maximum(y-agent.hunt_square//2, 0)
-        bottom = np.minimum(y-agent.hunt_square//2+agent.hunt_square, self.h)
-        local_map = self.map[left:right, top:bottom]
-        id_prey_loc = np.where(local_map > 0)
-
         min_dist = np.inf
         target_prey = None
         killed_id = None
-        for (local_x, local_y) in zip(id_prey_loc[0], id_prey_loc[1]):
-            candidate_agent = self.agents[local_map[local_x, local_y]]
-            if not candidate_agent.predator:
-                x_prey, y_prey = candidate_agent.pos
-                dist = np.sqrt((x-x_prey)**2+(y-y_prey)**2)
-                if dist < min_dist:
-                    min_dist = dist
-                    target_prey = candidate_agent
+
+        hunt_x = x-agent.hunt_square//2
+        hunt_y = y-agent.hunt_square//2
+
+        if hunt_x < 0:
+            hunt_x = self.w+hunt_x
+        if hunt_y < 0:
+            hunt_y = self.h+hunt_y
+
+        for i in range(agent.hunt_square):
+            for j in range(agent.hunt_square):
+                x_coord = hunt_x + i
+                y_coord = hunt_y + j
+                if x_coord < 0:
+                    x_coord = self.w+x_coord
+                if y_coord < 0:
+                    y_coord = self.h+y_coord
+
+                if x_coord >= self.w:
+                    x_coord = x_coord - self.w
+                if y_coord >= self.h:
+                    y_coord = y_coord - self.h
+                if self.map[x_coord][y_coord] > 0:
+                    candidate_agent = self.agents[self.map[x_coord, y_coord]]
+                    if not candidate_agent.predator:
+                        x_prey, y_prey = candidate_agent.pos
+                        dist = np.sqrt((x-x_prey)**2+(y-y_prey)**2)
+                        if dist < min_dist:
+                            min_dist = dist
+                            target_prey = candidate_agent
+
         if target_prey is not None:
             reward += 1
             target_prey.dead = True
@@ -485,62 +545,39 @@ class SimplePopulationDynamics(BaseEnv):
     def _get_obs(self, agent):
         x, y = agent.pos
         obs = np.zeros((4+self.agent_emb_dim, self.vision_width, self.vision_height))
-        left = np.maximum(x-self.vision_width//2, 0)
-        right = np.minimum(x-self.vision_width//2+self.vision_width, self.w)
-        top = np.maximum(y-self.vision_height//2, 0)
-        bottom = np.minimum(y-self.vision_height//2+self.vision_height, self.h)
-        local_map = self.map[left:right, top:bottom]
         obs[4:, self.vision_width//2, self.vision_height//2] = self.agent_embeddings[agent.id]
+        vision_x = x-self.vision_width//2
+        vision_y = y-self.vision_height//2
 
-        object_indice = np.where(local_map != 0)
-        local_width, local_height = local_map.shape
-        x_offset = self.vision_width - local_width
-        y_offset = self.vision_height - local_height
+        if vision_x < 0:
+            vision_x = self.w+vision_x
+        if vision_y < 0:
+            vision_y = self.h+vision_y
 
-        x_offset = 0
-        y_offset = 0
+        for i in range(self.vision_width):
+            for j in range(self.vision_height):
+                x_coord = vision_x + i
+                y_coord = vision_y + j
+                if x_coord < 0:
+                    x_coord = self.w+x_coord
+                if y_coord < 0:
+                    y_coord = self.h+y_coord
 
-        if x-self.vision_width//2 < 0:
-            x_offset = -(x-self.vision_width//2)
-            obs[0, :x_offset] = self.property[-1][1][0]
-            obs[1, :x_offset] = self.property[-1][1][1]
-            obs[2, :x_offset] = self.property[-1][1][2]
+                if x_coord >= self.w:
+                    x_coord = x_coord - self.w
+                if y_coord >= self.h:
+                    y_coord = y_coord - self.h
 
-        if y-self.vision_height//2 < 0:
-            y_offset = -(y-self.vision_height//2)
-            obs[0, :, :y_offset] = self.property[-1][1][0]
-            obs[1, :, :y_offset] = self.property[-1][1][1]
-            obs[2, :, :y_offset] = self.property[-1][1][2]
-
-        if x-self.vision_width//2+self.vision_width > self.w:
-            right_offset = (x-self.vision_width//2+self.vision_width - self.w)
-            obs[0, -right_offset:] = self.property[-1][1][0]
-            obs[1, -right_offset:] = self.property[-1][1][1]
-            obs[2, -right_offset:] = self.property[-1][1][2]
-
-        if y-self.vision_height//2+self.vision_height > self.h:
-            bottom_offset = (y-self.vision_height//2+self.vision_height - self.h)
-            obs[0, :, -bottom_offset:] = self.property[-1][1][0]
-            obs[1, :, -bottom_offset:] = self.property[-1][1][1]
-            obs[2, :, -bottom_offset:] = self.property[-1][1][2]
-
-        for object_x, object_y in zip(object_indice[0], object_indice[1]):
-            if local_map[object_x, object_y] > 0:
-                other_agent = self.agents[local_map[object_x, object_y]]
-                agent_id = other_agent.id
-                object_x += x_offset
-                object_y += y_offset
-
-                obs[0, object_x, object_y] = other_agent.property[1][0]
-                obs[1, object_x, object_y] = other_agent.property[1][1]
-                obs[2, object_x, object_y] = other_agent.property[1][2]
-                obs[3, object_x, object_y] = other_agent.health
-            elif local_map[object_x, object_y] == -1:
-                object_x += x_offset
-                object_y += y_offset
-                obs[0, object_x, object_y] = self.property[-1][1][0]
-                obs[1, object_x, object_y] = self.property[-1][1][1]
-                obs[2, object_x, object_y] = self.property[-1][1][2]
+                if self.map[x_coord][y_coord] > 0:
+                    other_agent = self.agents[self.map[x_coord][y_coord]]
+                    obs[0, i, j] = other_agent.property[1][0]
+                    obs[1, i, j] = other_agent.property[1][1]
+                    obs[2, i, j] = other_agent.property[1][2]
+                    obs[3, i, j] = other_agent.health
+                elif self.map[x_coord][y_coord] == -1:
+                    obs[0, i, j] = self.property[-1][1][0]
+                    obs[1, i, j] = self.property[-1][1][1]
+                    obs[2, i, j] = self.property[-1][1][2]
 
 
         if self.obs_type == 'dense':
@@ -551,62 +588,39 @@ class SimplePopulationDynamics(BaseEnv):
     def _get_all(self, agent):
         x, y = agent.pos
         obs = np.zeros((4+self.agent_emb_dim, self.vision_width, self.vision_height))
-
-        left = np.maximum(x-self.vision_width//2, 0)
-        right = np.minimum(x-self.vision_width//2+self.vision_width, self.w)
-        top = np.maximum(y-self.vision_height//2, 0)
-        bottom = np.minimum(y-self.vision_height//2+self.vision_height, self.h)
-        local_map = self.map[left:right, top:bottom]
-
         obs[4:, self.vision_width//2, self.vision_height//2] = self.agent_embeddings[agent.id]
+        vision_x = x-self.vision_width//2
+        vision_y = y-self.vision_height//2
 
-        object_indice = np.where(local_map != 0)
+        if vision_x < 0:
+            vision_x = self.w+vision_x
+        if vision_y < 0:
+            vision_y = self.h+vision_y
 
-        x_offset = 0
-        y_offset = 0
-        if x-self.vision_width//2 < 0:
-            x_offset = -(x-self.vision_width//2)
-            obs[0, :x_offset] = self.property[-1][1][0]
-            obs[1, :x_offset] = self.property[-1][1][1]
-            obs[2, :x_offset] = self.property[-1][1][2]
+        for i in range(self.vision_width):
+            for j in range(self.vision_height):
+                x_coord = vision_x + i
+                y_coord = vision_y + j
+                if x_coord < 0:
+                    x_coord = self.w+x_coord
+                if y_coord < 0:
+                    y_coord = self.h+y_coord
 
-        if y-self.vision_height//2 < 0:
-            y_offset = -(y-self.vision_height//2)
-            obs[0, :, :y_offset] = self.property[-1][1][0]
-            obs[1, :, :y_offset] = self.property[-1][1][1]
-            obs[2, :, :y_offset] = self.property[-1][1][2]
+                if x_coord >= self.w:
+                    x_coord = x_coord - self.w
+                if y_coord >= self.h:
+                    y_coord = y_coord - self.h
 
-        if x-self.vision_width//2+self.vision_width > self.w:
-            right_offset = (x-self.vision_width//2+self.vision_width - self.w)
-            obs[0, -right_offset:] = self.property[-1][1][0]
-            obs[1, -right_offset:] = self.property[-1][1][1]
-            obs[2, -right_offset:] = self.property[-1][1][2]
-
-        if y-self.vision_height//2+self.vision_height > self.h:
-            bottom_offset = (y-self.vision_height//2+self.vision_height - self.h)
-            obs[0, :, -bottom_offset:] = self.property[-1][1][0]
-            obs[1, :, -bottom_offset:] = self.property[-1][1][1]
-            obs[2, :, -bottom_offset:] = self.property[-1][1][2]
-
-
-        for object_x, object_y in zip(object_indice[0], object_indice[1]):
-            if local_map[object_x, object_y] > 0:
-                other_agent = self.agents[local_map[object_x, object_y]]
-                agent_id = other_agent.id
-
-                object_x += x_offset
-                object_y += y_offset
-
-                obs[0, object_x, object_y] = other_agent.property[1][0]
-                obs[1, object_x, object_y] = other_agent.property[1][1]
-                obs[2, object_x, object_y] = other_agent.property[1][2]
-                obs[3, object_x, object_y] = other_agent.health
-            elif local_map[object_x, object_y] == -1:
-                object_x += x_offset
-                object_y += y_offset
-                obs[0, object_x, object_y] = self.property[-1][1][0]
-                obs[1, object_x, object_y] = self.property[-1][1][1]
-                obs[2, object_x, object_y] = self.property[-1][1][2]
+                if self.map[x_coord][y_coord] > 0:
+                    other_agent = self.agents[self.map[x_coord][y_coord]]
+                    obs[0, i, j] = other_agent.property[1][0]
+                    obs[1, i, j] = other_agent.property[1][1]
+                    obs[2, i, j] = other_agent.property[1][2]
+                    obs[3, i, j] = other_agent.health
+                elif self.map[x_coord][y_coord] == -1:
+                    obs[0, i, j] = self.property[-1][1][0]
+                    obs[1, i, j] = self.property[-1][1][1]
+                    obs[2, i, j] = self.property[-1][1][2]
 
         rewards, killed = self.get_reward(agent)
 
@@ -614,6 +628,7 @@ class SimplePopulationDynamics(BaseEnv):
             return (agent.id, obs[:4].reshape(-1)), rewards, killed
         else:
             return (agent.id, obs), rewards, killed
+
     def remove_dead_agent_emb(self, dead_list):
         for id in dead_list:
             del self.agent_embeddings[id]
