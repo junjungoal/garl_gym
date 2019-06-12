@@ -446,8 +446,8 @@ class SimplePopulationDynamics(BaseEnv):
             target_prey.dead = True
             agent.max_reward += 1
             killed_id = target_prey.id
-        #else:
-        #    reward -= 0.2
+        else:
+            reward -= 1
 
         if agent.health <= 0:
             reward -= 1
@@ -457,8 +457,8 @@ class SimplePopulationDynamics(BaseEnv):
         reward = 0
         if agent.dead:
             reward -= 1
-        #else:
-        #    reward += 0.2
+        else:
+            reward += 1
 
         return ((agent.id, reward), (agent.id, None))
 
@@ -525,18 +525,12 @@ class SimplePopulationDynamics(BaseEnv):
 
                 if self.map[x_coord][y_coord] > 0:
                     other_agent = self.agents[self.map[x_coord][y_coord]]
-                    obs[0, i, j] = other_agent.property[1][0]
-                    obs[1, i, j] = other_agent.property[1][1]
-                    obs[2, i, j] = other_agent.property[1][2]
+                    obs[:3, i, j] = other_agent.property[1]
                     obs[3, i, j] = other_agent.health
                 elif self.map[x_coord][y_coord] == -1: #wall
-                    obs[0, i, j] = 1.
-                    obs[1, i, j] = 1.
-                    obs[2, i, j] = 1.
+                    obs[:3, i, j] = 1.
                 else:
-                    obs[0, i, j] = self.property[0][1][0]
-                    obs[1, i, j] = self.property[0][1][1]
-                    obs[2, i, j] = self.property[0][1][2]
+                    obs[:3, i, j] = self.property[0][1]
 
 
 
@@ -573,18 +567,12 @@ class SimplePopulationDynamics(BaseEnv):
 
                 if self.map[x_coord][y_coord] > 0:
                     other_agent = self.agents[self.map[x_coord][y_coord]]
-                    obs[0, i, j] = other_agent.property[1][0]
-                    obs[1, i, j] = other_agent.property[1][1]
-                    obs[2, i, j] = other_agent.property[1][2]
+                    obs[:3, i, j] = other_agent.property[1]
                     obs[3, i, j] = other_agent.health
                 elif self.map[x_coord][y_coord] == -1:
-                    obs[0, i, j] = 1.
-                    obs[1, i, j] = 1.
-                    obs[2, i, j] = 1.
+                    obs[:3, i, j] = 1.
                 else:
-                    obs[0, i, j] = self.property[0][1][0]
-                    obs[1, i, j] = self.property[0][1][1]
-                    obs[2, i, j] = self.property[0][1][2]
+                    obs[:3, i, j] = self.property[0][1]
 
         rewards, killed = self.get_reward(agent)
 
@@ -641,4 +629,209 @@ class SimplePopulationDynamics(BaseEnv):
         return obs, dict(rewards)
 
 
+def get_obs(env, only_view=False):
+    global agent_emb_dim
+    agent_emb_dim = env.agent_emb_dim
+    global vision_width
+    vision_width = env.vision_width
+    global vision_height
+    vision_height = env.vision_height
+    global agent_embeddings
+    agent_embeddings = env.agent_embeddings
+    global agents
+    agents = env.agents
+    global cpu_cores
+    cpu_cores = env.cpu_cores
+    global h
+    h = env.h
+    global w
+    w = env.w
+    global _map
+    _map = env.map
+    global _property
+    _property = env.property
+    global obs_type
+    obs_type = env.obs_type
 
+
+    if env.cpu_cores is None:
+        cores = mp.cpu_count()
+    else:
+        cores = cpu_cores
+
+    if env.args.multiprocessing:
+        pool = mp.Pool(processes=cores)
+        if only_view:
+            obs = pool.map(_get_obs, agents.values())
+            return obs
+        else:
+            obs = pool.map(_get_all, agents.values())
+        pool.close()
+    else:
+        obs = []
+        if only_view:
+            for agent in agents.values():
+                obs.append(_get_obs(agent))
+            return obs
+        else:
+            for agent in agents.values():
+                obs.append(_get_all(agent))
+
+    obs, rewards, killed = zip(*obs)
+    #killed = list(dict(killed).values())
+    for id, killed_agent in killed:
+        if killed_agent is not None:
+            env.increase_health(agents[id])
+    killed = list(dict(killed).values())
+
+    return obs, dict(rewards), killed
+
+
+
+def _get_all(agent):
+    x, y = agent.pos
+    obs = np.zeros((4+agent_emb_dim, vision_width, vision_height))
+    obs[4:, vision_width//2, vision_height//2] = agent_embeddings[agent.id]
+    vision_x = x-vision_width//2
+    vision_y = y-vision_height//2
+
+    if vision_x < 0:
+        vision_x = w+vision_x
+    if vision_y < 0:
+        vision_y = h+vision_y
+
+    for i in range(vision_width):
+        for j in range(vision_height):
+            x_coord = vision_x + i
+            y_coord = vision_y + j
+            if x_coord < 0:
+                x_coord = w+x_coord
+            if y_coord < 0:
+                y_coord = h+y_coord
+
+            if x_coord >= w:
+                x_coord = x_coord - w
+            if y_coord >= h:
+                y_coord = y_coord - h
+
+            if _map[x_coord][y_coord] > 0:
+                other_agent = agents[_map[x_coord][y_coord]]
+                obs[:3, i, j] = other_agent.property[1]
+                obs[3, i, j] = other_agent.health
+            elif _map[x_coord][y_coord] == -1:
+                obs[:3, i, j] = 1.
+            else:
+                obs[:3, i, j] = _property[0][1]
+
+    rewards, killed = _get_reward(agent)
+
+    if obs_type == 'dense':
+        return (agent.id, obs[:4].reshape(-1)), rewards, killed
+    else:
+        return (agent.id, obs), rewards, killed
+
+
+def _get_obs(agent):
+    x, y = agent.pos
+    obs = np.zeros((4+agent_emb_dim, vision_width, vision_height))
+    obs[4:, vision_width//2, vision_height//2] = agent_embeddings[agent.id]
+    vision_x = x-vision_width//2
+    vision_y = y-vision_height//2
+
+    if vision_x < 0:
+        vision_x = w+vision_x
+    if vision_y < 0:
+        vision_y = h+vision_y
+
+    for i in range(vision_width):
+        for j in range(vision_height):
+            x_coord = vision_x + i
+            y_coord = vision_y + j
+            if x_coord < 0:
+                x_coord = w+x_coord
+            if y_coord < 0:
+                y_coord = h+y_coord
+
+            if x_coord >= w:
+                x_coord = x_coord - w
+            if y_coord >= h:
+                y_coord = y_coord - h
+
+            if _map[x_coord][y_coord] > 0:
+                other_agent = agents[_map[x_coord][y_coord]]
+                obs[:3, i, j] = other_agent.property[1]
+                obs[3, i, j] = other_agent.health
+            elif _map[x_coord][y_coord] == -1:
+                obs[:3, i, j] = 1.
+            else:
+                obs[:3, i, j] = _property[0][1]
+
+    if obs_type == 'dense':
+        return (agent.id, obs[:4].reshape(-1))
+    else:
+        return (agent.id, obs)
+
+def get_predator_reward(agent):
+    reward = 0
+    x, y = agent.pos
+    min_dist = np.inf
+    target_prey = None
+    killed_id = None
+
+    hunt_x = x-agent.hunt_square//2
+    hunt_y = y-agent.hunt_square//2
+
+    if hunt_x < 0:
+        hunt_x = w+hunt_x
+    if hunt_y < 0:
+        hunt_y = h+hunt_y
+
+    for i in range(agent.hunt_square):
+        for j in range(agent.hunt_square):
+            x_coord = hunt_x + i
+            y_coord = hunt_y + j
+            if x_coord < 0:
+                x_coord = w+x_coord
+            if y_coord < 0:
+                y_coord = h+y_coord
+
+            if x_coord >= w:
+                x_coord = x_coord - w
+            if y_coord >= h:
+                y_coord = y_coord - h
+            if _map[x_coord][y_coord] > 0:
+                candidate_agent = agents[_map[x_coord, y_coord]]
+                if not candidate_agent.predator:
+                    x_prey, y_prey = candidate_agent.pos
+                    dist = np.sqrt((x-x_prey)**2+(y-y_prey)**2)
+                    if dist < min_dist:
+                        min_dist = dist
+                        target_prey = candidate_agent
+
+    if target_prey is not None:
+        reward += 1
+        target_prey.dead = True
+        agent.max_reward += 1
+        killed_id = target_prey.id
+    #else:
+    #    reward -= 0.2
+
+    if agent.health <= 0:
+        reward -= 1
+    return ((agent.id, reward), (agent.id, killed_id))
+
+def get_prey_reward(agent):
+    reward = 0
+    if agent.dead:
+        reward -= 1
+    #else:
+    #    reward += 0.2
+
+    return ((agent.id, reward), (agent.id, None))
+
+def _get_reward(agent):
+    if agent.predator:
+        #return self.get_predator_reward(agent) / len(self.predators)
+        return get_predator_reward(agent)
+    else:
+        return get_prey_reward(agent)
