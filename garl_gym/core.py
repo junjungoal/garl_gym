@@ -48,4 +48,5 @@ class Agent(object):
         self.max_reward = 0
         self.birth_time = None
         self.age = 0
+        self.get_closer = False
 

@@ -663,10 +663,13 @@ def get_obs(env, only_view=False):
         pool = mp.Pool(processes=cores)
         if only_view:
             obs = pool.map(_get_obs, agents.values())
+            pool.close()
+            pool.join()
             return obs
         else:
             obs = pool.map(_get_all, agents.values())
         pool.close()
+        pool.join()
     else:
         obs = []
         if only_view:
