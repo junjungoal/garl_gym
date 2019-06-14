@@ -49,4 +49,12 @@ class Agent(object):
         self.birth_time = None
         self.age = 0
         self.get_closer = False
+        self.liking = None
+        self.physical = None
+        self.environmental_condition = None
+    def utility(self):
+        if self.predator:
+            return (self.physical + self.environmental_condition)**self.liking
+        else:
+            return -((1-self.physical)+(1-self.environmental_condition))**self.liking
 

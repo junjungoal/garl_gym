@@ -290,12 +290,13 @@ class SimplePopulationDynamics(BaseEnv):
 
 
     def take_actions(self, actions):
-        for id, agent in self.agents.items():
+        for id, action in actions.items():
+            agent = self.agents[id]
             if agent.predator:
-                self._take_action(agent, actions[id])
+                self._take_action(agent, action)
                 self.decrease_health(agent)
             else:
-                self._take_action(agent, actions[id])
+                self._take_action(agent, action)
 
     def _take_action(self, agent, action):
         def in_board(x, y):
@@ -629,7 +630,9 @@ class SimplePopulationDynamics(BaseEnv):
         return obs, dict(rewards)
 
 
-def get_obs(env, only_view=False):
+def get_obs(env, only_view=False, predator_obs=None, prey_obs=None):
+    if predator_obs == True and prey_obs == True:
+        raise ValueError('Either predator_obs or prey_obs has to be False')
     global agent_emb_dim
     agent_emb_dim = env.agent_emb_dim
     global vision_width
@@ -639,7 +642,16 @@ def get_obs(env, only_view=False):
     global agent_embeddings
     agent_embeddings = env.agent_embeddings
     global agents
-    agents = env.agents
+    if predator_obs == True:
+        agents = env.predators
+    elif prey_obs == True:
+        agents = env.preys
+    else:
+        agents = env.agents
+
+    global agents_dict
+    agents_dict = env.agents
+
     global cpu_cores
     cpu_cores = env.cpu_cores
     global h
@@ -718,7 +730,7 @@ def _get_all(agent):
                 y_coord = y_coord - h
 
             if _map[x_coord][y_coord] > 0:
-                other_agent = agents[_map[x_coord][y_coord]]
+                other_agent = agents_dict[_map[x_coord][y_coord]]
                 obs[:3, i, j] = other_agent.property[1]
                 obs[3, i, j] = other_agent.health
             elif _map[x_coord][y_coord] == -1:
@@ -761,7 +773,7 @@ def _get_obs(agent):
                 y_coord = y_coord - h
 
             if _map[x_coord][y_coord] > 0:
-                other_agent = agents[_map[x_coord][y_coord]]
+                other_agent = agents_dict[_map[x_coord][y_coord]]
                 obs[:3, i, j] = other_agent.property[1]
                 obs[3, i, j] = other_agent.health
             elif _map[x_coord][y_coord] == -1:
@@ -803,7 +815,7 @@ def get_predator_reward(agent):
             if y_coord >= h:
                 y_coord = y_coord - h
             if _map[x_coord][y_coord] > 0:
-                candidate_agent = agents[_map[x_coord, y_coord]]
+                candidate_agent = agents_dict[_map[x_coord, y_coord]]
                 if not candidate_agent.predator:
                     x_prey, y_prey = candidate_agent.pos
                     dist = np.sqrt((x-x_prey)**2+(y-y_prey)**2)
