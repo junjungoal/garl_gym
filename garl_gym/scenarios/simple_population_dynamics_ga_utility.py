@@ -248,7 +248,8 @@ class SimplePopulationDynamicsGAUtility(BaseEnv):
                 self.food_map[x][y] = -2
                 self.num_food += 1
 
-    def crossover_predator(self, crossover_scope=3, crossover_rate=0.001, mutation_rate=0.15):
+    def crossover_predator(self, crossover_scope=3, crossover_rate=0.001, mutation_rate=0.015):
+        self.timestep += 1
 
         predators = list(self.predators.values())
         predators.sort(key=lambda x: x.age, reverse=True)
@@ -286,7 +287,7 @@ class SimplePopulationDynamicsGAUtility(BaseEnv):
             self.agent_embeddings[child.id] = new_embedding
             self.predator_num += 1
 
-    def crossover_prey(self, crossover_scope=3, crossover_rate=0.001, mutation_rate=0.15):
+    def crossover_prey(self, crossover_scope=3, crossover_rate=0.001, mutation_rate=0.015):
         preys = list(self.preys.values())
         preys.sort(key=lambda x: x.age, reverse=True)
         n = max(1, int(len(preys) * crossover_rate))
