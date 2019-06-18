@@ -630,9 +630,7 @@ class SimplePopulationDynamics(BaseEnv):
         return obs, dict(rewards)
 
 
-def get_obs(env, only_view=False, predator_obs=None, prey_obs=None):
-    if predator_obs == True and prey_obs == True:
-        raise ValueError('Either predator_obs or prey_obs has to be False')
+def get_obs(env, only_view=False):
     global agent_emb_dim
     agent_emb_dim = env.agent_emb_dim
     global vision_width
@@ -642,12 +640,7 @@ def get_obs(env, only_view=False, predator_obs=None, prey_obs=None):
     global agent_embeddings
     agent_embeddings = env.agent_embeddings
     global agents
-    if predator_obs == True:
-        agents = env.predators
-    elif prey_obs == True:
-        agents = env.preys
-    else:
-        agents = env.agents
+    agents = env.agents
 
     global agents_dict
     agents_dict = env.agents
@@ -671,33 +664,48 @@ def get_obs(env, only_view=False, predator_obs=None, prey_obs=None):
     else:
         cores = cpu_cores
 
-    if env.args.multiprocessing:
-        pool = mp.Pool(processes=cores)
-        if only_view:
+    if only_view:
+        if env.args.multiprocessing:
+            pool = mp.Pool(processes=cores)
             obs = pool.map(_get_obs, agents.values())
             pool.close()
             pool.join()
             return obs
         else:
-            obs = pool.map(_get_all, agents.values())
-        pool.close()
-        pool.join()
-    else:
-        obs = []
-        if only_view:
             for agent in agents.values():
                 obs.append(_get_obs(agent))
             return obs
+    else:
+        if env.args.multiprocessing:
+            pool = mp.Pool(processes=cores)
+            obs = pool.map(_get_all, agents.values())
+            pool.close()
+            pool.join()
+            #obs.extend(prey_obs)
         else:
+            obs = []
             for agent in agents.values():
                 obs.append(_get_all(agent))
 
-    obs, rewards, killed = zip(*obs)
-    #killed = list(dict(killed).values())
-    for id, killed_agent in killed:
+    obs, killed = zip(*obs)
+    killed = dict(killed)
+
+    global _killed
+    _killed = killed
+    if env.args.multiprocessing:
+        pool = mp.Pool(processes=cores)
+        rewards = pool.map(_get_reward, agents.values())
+        pool.close()
+        pool.join()
+    else:
+        rewards = []
+        for agent in agents.values():
+            reward = _get_reward(agent)
+
+    for id, killed_agent in killed.items():
         if killed_agent is not None:
             env.increase_health(agents[id])
-    killed = list(dict(killed).values())
+    killed = list(killed.values())
 
     return obs, dict(rewards), killed
 
@@ -709,7 +717,6 @@ def _get_all(agent):
     obs[4:, vision_width//2, vision_height//2] = agent_embeddings[agent.id]
     vision_x = x-vision_width//2
     vision_y = y-vision_height//2
-
     if vision_x < 0:
         vision_x = w+vision_x
     if vision_y < 0:
@@ -738,12 +745,15 @@ def _get_all(agent):
             else:
                 obs[:3, i, j] = _property[0][1]
 
-    rewards, killed = _get_reward(agent)
+    if agent.predator:
+        killed = _get_killed(agent)
+    else:
+        killed = (agent.id, None)
 
     if obs_type == 'dense':
-        return (agent.id, obs[:4].reshape(-1)), rewards, killed
+        return (agent.id, obs[:4].reshape(-1)), killed
     else:
-        return (agent.id, obs), rewards, killed
+        return (agent.id, obs), killed
 
 
 def _get_obs(agent):
@@ -786,8 +796,7 @@ def _get_obs(agent):
     else:
         return (agent.id, obs)
 
-def get_predator_reward(agent):
-    reward = 0
+def _get_killed(agent):
     x, y = agent.pos
     min_dist = np.inf
     target_prey = None
@@ -824,29 +833,23 @@ def get_predator_reward(agent):
                         target_prey = candidate_agent
 
     if target_prey is not None:
-        reward += 1
-        target_prey.dead = True
-        agent.max_reward += 1
         killed_id = target_prey.id
-    #else:
-    #    reward -= 0.2
+    return (agent.id, killed_id)
 
-    if agent.health <= 0:
-        reward -= 1
-    return ((agent.id, reward), (agent.id, killed_id))
-
-def get_prey_reward(agent):
-    reward = 0
-    if agent.dead:
-        reward -= 1
-    #else:
-    #    reward += 0.2
-
-    return ((agent.id, reward), (agent.id, None))
 
 def _get_reward(agent):
     if agent.predator:
-        #return self.get_predator_reward(agent) / len(self.predators)
-        return get_predator_reward(agent)
+        reward = 0
+        if _killed[agent.id] is not None:
+            reward += 1
+
+        if agent.health <= 0:
+            reward -= 1
     else:
-        return get_prey_reward(agent)
+        reward = 0
+        if agent.id in _killed.values():
+            reward -= 1
+        #else:
+        #    reward += 0.2
+
+    return (agent.id, reward)

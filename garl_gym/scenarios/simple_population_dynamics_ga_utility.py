@@ -199,8 +199,8 @@ class SimplePopulationDynamicsGAUtility(BaseEnv):
     def _init_property(self):
         self.property[-3] = [1, [1, 0, 0]]
         self.property[-2] = [1, [0, 1, 0]]
-        self.property[-1] = [1, [0.411, 0.411, 0.411]]
-        self.property[0] = [1, [0, 0, 0]]
+        self.property[-1] = [1, [0, 0, 0]]
+        self.property[0] = [1, [0.411, 0.411, 0.411]]
 
     def _gen_power(self, cnt):
         def max_view_size(view_size1, view_size2):
@@ -432,9 +432,7 @@ class SimplePopulationDynamicsGAUtility(BaseEnv):
                 id = self.map[i][j]
                 if self.food_map[i][j] == -2:
                     img[i, j, :] = 255*np.array(self.property[-2][1])
-                elif id == 0:
-                    img[i, j, :] = 255
-                elif id == -1:
+                elif id <= 0 and id > -2:
                     img[i, j, :] = 255*np.array(self.property[id][1])
                 else:
                     # prey
@@ -444,6 +442,7 @@ class SimplePopulationDynamicsGAUtility(BaseEnv):
             x, y = predator.pos
             img[x, y, :] = 255*np.array(predator.property[1])
         return img
+
 
 
 
@@ -749,6 +748,7 @@ def get_obs(env, only_view=False):
         if killed_agent is not None:
             env.increase_health(agents[id])
     killed = list(dict(killed).values())
+    env.killed = killed
 
     return obs, dict(rewards), killed
 
@@ -787,6 +787,9 @@ def _get_all(agent):
                 other_agent = agents[_map[x_coord][y_coord]]
                 obs[:3, i, j] = other_agent.property[1]
                 obs[3, i, j] = other_agent.health
+                obs[4, i, j] = other_agent.liking
+                obs[5, i, j] = other_agent.environmental_condition
+                obs[6, i, j] = other_agent.physical
             elif _map[x_coord][y_coord] == -1:
                 obs[:3, i, j] = 1.
             else:
@@ -833,6 +836,9 @@ def _get_obs(agent):
                 other_agent = agents[_map[x_coord][y_coord]]
                 obs[:3, i, j] = other_agent.property[1]
                 obs[3, i, j] = other_agent.health
+                obs[4, i, j] = other_agent.liking
+                obs[5, i, j] = other_agent.environmental_condition
+                obs[6, i, j] = other_agent.physical
             elif _map[x_coord][y_coord] == -1:
                 obs[:3, i, j] = 1.
             else:

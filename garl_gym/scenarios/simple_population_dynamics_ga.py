@@ -195,8 +195,8 @@ class SimplePopulationDynamicsGA(BaseEnv):
     def _init_property(self):
         self.property[-3] = [1, [1, 0, 0]]
         self.property[-2] = [1, [0, 1, 0]]
-        self.property[-1] = [1, [0.411, 0.411, 0.411]]
-        self.property[0] = [1, [0, 0, 0]]
+        self.property[-1] = [1, [0, 0, 0]]
+        self.property[0] = [1, [0.411, 0.411, 0.411]]
 
     def _gen_power(self, cnt):
         def max_view_size(view_size1, view_size2):
@@ -250,37 +250,55 @@ class SimplePopulationDynamicsGA(BaseEnv):
         index = 0
         for predator in list(self.predators.values()):
             x, y = predator.pos
-            local_map = self.map[(x-crossover_scope//2):(x-crossover_scope//2+crossover_scope), (y-crossover_scope//2):(y-crossover_scope//2+crossover_scope)]
-            agent_indice = np.where(local_map > 0)
-            if len(agent_indice[0]) == 0 or predator.crossover:
-                continue
+            crossover_x = x-crossover_scope
+            crossover_y = y-crossover_scope
 
-            for (local_x, local_y) in zip(agent_indice[0], agent_indice[1]):
-                candidate_id = local_map[local_x, local_y]
-                candidate_agent = self.agents[candidate_id]
-                if candidate_agent.predator and not candidate_agent.crossover and predator.id != candidate_agent.id:
-                    candidate_agent.get_closer = True
-                    if np.random.rand() < crossover_rate:
-                        for i in range(np.random.randint(self.args.max_predator_offsprings)):
-                            candidate_agent.crossover = True
-                            predator.crossover = True
-                            child = Agent()
-                            child.id = self.max_id
-                            self.max_id += 1
-                            new_embedding = np.random.normal(size=[self.agent_emb_dim])
-                            self.agent_embeddings[child.id] = new_embedding
-                            child.spped = None
-                            child.predator = True
-                            child.health = 1
-                            child.hunt_square = self.max_hunt_square
-                            child.property = [self._gen_power(child.id), [0, 0, 1]]
-                            x = ind[0][perm[index]]
-                            y = ind[1][perm[index]]
-                            index += 1
-                            self.map[x][y] = child.id
-                            child.pos = (x, y)
-                            self.predators[child.id] = child
-                            self.predator_num += 1
+            if crossover_x<0:
+                crossover_x = w+crossover_x
+            if crossover_y<0:
+                crossover_y = h+crossover_y
+
+            for i in range(crossover_scope):
+                for j in range(crossover_scope):
+                    x_coord = crossover_x + i
+                    y_coord = crossover_y + j
+                    if x_coord<0:
+                        x_coord = w+x_coord
+                    if y_coord<0:
+                        y_coord = h+y_coord
+
+                    if x_coord >=w:
+                        x_coord = x_coord-w
+                    if y_coord >= h:
+                        y_coord = y_coord-h
+
+                    candidate_id = self.map[x_coord, y_coord]
+                    if candidate_id<=0 or not self.agents[candidate_id].predator:
+                        continue
+                    candidate_agent = self.agents[candidate_id]
+                    if candidate_agent.predator and not candidate_agent.crossover and predator.id != candidate_agent.id:
+                        candidate_agent.get_closer = True
+                        if np.random.rand() < crossover_rate:
+                            for i in range(np.random.randint(self.args.max_predator_offsprings)):
+                                candidate_agent.crossover = True
+                                predator.crossover = True
+                                child = Agent()
+                                child.id = self.max_id
+                                self.max_id += 1
+                                new_embedding = np.random.normal(size=[self.agent_emb_dim])
+                                self.agent_embeddings[child.id] = new_embedding
+                                child.spped = None
+                                child.predator = True
+                                child.health = 1
+                                child.hunt_square = self.max_hunt_square
+                                child.property = [self._gen_power(child.id), [0, 0, 1]]
+                                x = ind[0][perm[index]]
+                                y = ind[1][perm[index]]
+                                index += 1
+                                self.map[x][y] = child.id
+                                child.pos = (x, y)
+                                self.predators[child.id] = child
+                                self.predator_num += 1
 
     def crossover_prey(self, crossover_scope=3, crossover_rate=0.001):
         ind = np.where(self.map == 0)
@@ -288,41 +306,106 @@ class SimplePopulationDynamicsGA(BaseEnv):
         index = 0
         for prey in list(self.preys.values()):
             x, y = prey.pos
-            left = np.maximum(x-crossover_scope//2, 0)
-            right = np.minimum(x-crossover_scope//2+crossover_scope, self.w)
-            top = np.maximum(y-crossover_scope//2, 0)
-            bottom = np.minimum(y-crossover_scope//2+crossover_scope, self.h)
-            local_map = self.map[left:right, top:bottom]
-            agent_indice = np.where(local_map > 0)
-            if len(agent_indice[0]) == 0 and not prey.crossover:
-                continue
+            crossover_x = x-crossover_scope
+            crossover_y = y-crossover_scope
 
-            for (local_x, local_y) in zip(agent_indice[0], agent_indice[1]):
-                candidate_id = local_map[local_x, local_y]
-                candidate_agent = self.agents[candidate_id]
-                candidate_agent.get_closer = True
-                if not candidate_agent.predator and not candidate_agent.crossover and candidate_agent.id != prey.id:
-                    if np.random.rand() < crossover_rate:
-                        for i in range(np.random.randint(self.args.max_prey_offsprings)):
-                            candidate_agent.crossover = True
-                            prey.crossover = True
-                            child = Agent()
-                            child.id = self.max_id
-                            self.max_id += 1
-                            child.speed = None
-                            child.predator = False
-                            child.health = 1
-                            new_embedding = np.random.normal(size=[self.agent_emb_dim])
-                            self.agent_embeddings[child.id] = new_embedding
-                            child.hunt_square = self.max_hunt_square
-                            child.property = [self._gen_power(child.id), [1, 0, 0]]
-                            x = ind[0][perm[index]]
-                            y = ind[1][perm[index]]
-                            index += 1
-                            self.map[x][y] = child.id
-                            child.pos = (x, y)
-                            self.preys[child.id] = child
-                            self.prey_num += 1
+            if crossover_x<0:
+                crossover_x = w+crossover_x
+            if crossover_y<0:
+                crossover_y = h+crossover_y
+
+            for i in range(crossover_scope):
+                for j in range(crossover_scope):
+                    x_coord = crossover_x + i
+                    y_coord = crossover_y + j
+                    if x_coord<0:
+                        x_coord = w+x_coord
+                    if y_coord<0:
+                        y_coord = h+y_coord
+
+                    if x_coord >=w:
+                        x_coord = x_coord-w
+                    if y_coord >= h:
+                        y_coord = y_coord-h
+
+                    candidate_id = self.map[x_coord, y_coord]
+                    if candidate_id<=0 or self.agents[candidate_id].predator:
+                        continue
+
+                    candidate_agent = self.agents[candidate_id]
+                    if not candidate_agent.predator and not candidate_agent.crossover and candidate_agent.id != prey.id:
+                        candidate_agent.get_closer = True
+                        if np.random.rand() < crossover_rate:
+                            for i in range(np.random.randint(self.args.max_prey_offsprings)):
+                                candidate_agent.crossover = True
+                                prey.crossover = True
+                                child = Agent()
+                                child.id = self.max_id
+                                self.max_id += 1
+                                child.speed = None
+                                child.predator = False
+                                child.health = 1
+                                new_embedding = np.random.normal(size=[self.agent_emb_dim])
+                                self.agent_embeddings[child.id] = new_embedding
+                                child.hunt_square = self.max_hunt_square
+                                child.property = [self._gen_power(child.id), [1, 0, 0]]
+                                x = ind[0][perm[index]]
+                                y = ind[1][perm[index]]
+                                index += 1
+                                self.map[x][y] = child.id
+                                child.pos = (x, y)
+                                self.preys[child.id] = child
+                                self.prey_num += 1
+
+    def increase_predator(self, prob):
+        num = max(1, int(len(self.predators) * prob))
+        ind = np.where(self.map == 0)
+        perm = np.random.permutation(np.arange(len(ind[0])))
+
+        for i in range(num):
+            agent = Agent()
+            agent.health = 1
+            agent.original_health = 1
+            agent.birth_time = self.timestep
+            agent.predator = True
+
+            agent.id = self.max_id
+            self.max_id += 1
+            agent.speed = 1
+            agent.hunt_square = self.max_hunt_square
+            agent.property = [self._gen_power(agent.id), [0, 0, 1]]
+            x = ind[0][perm[i]]
+            y = ind[1][perm[i]]
+            if self.map[x][y] == 0:
+                self.map[x][y] = agent.id
+                agent.pos = (x, y)
+            self.predators[agent.id] = agent
+            new_embedding = np.random.normal(size=[self.agent_emb_dim])
+            self.agent_embeddings[agent.id] = new_embedding
+
+    def increase_prey(self, prob):
+        num = max(1, int(len(self.preys) * prob))
+        ind = np.where(self.map == 0)
+        perm = np.random.permutation(np.arange(len(ind[0])))
+        for i in range(num):
+            agent = Agent()
+            agent.health = 1
+            agent.original_health = 1
+            agent.birth_time = self.timestep
+            agent.predator = False
+
+            agent.id = self.max_id
+            self.max_id += 1
+            agent.property = [self._gen_power(agent.id), [1, 0, 0]]
+            x = ind[0][perm[i]]
+            y = ind[1][perm[i]]
+            if self.map[x][y] == 0:
+                self.map[x][y] = agent.id
+                agent.pos = (x, y)
+            self.preys[agent.id] = agent
+            new_embedding = np.random.normal(size=[self.agent_emb_dim])
+            self.agent_embeddings[agent.id] = new_embedding
+
 
 
     def take_actions(self, actions):
@@ -431,9 +514,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
                 id = self.map[i][j]
                 if self.food_map[i][j] == -2:
                     img[i, j, :] = 255*np.array(self.property[-2][1])
-                elif id == 0:
-                    img[i, j, :] = 255
-                elif id == -1:
+                elif id <= 0 and id > -2:
                     img[i, j, :] = 255*np.array(self.property[id][1])
                 else:
                     # prey
@@ -443,6 +524,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
             x, y = predator.pos
             img[x, y, :] = 255*np.array(predator.property[1])
         return img
+
 
 
 
