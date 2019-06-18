@@ -664,138 +664,13 @@ def get_obs(env, only_view=False):
     else:
         cores = cpu_cores
 
-    if only_view:
-        if env.args.multiprocessing:
-            pool = mp.Pool(processes=cores)
-            obs = pool.map(_get_obs, agents.values())
-            pool.close()
-            pool.join()
-            return obs
-        else:
-            for agent in agents.values():
-                obs.append(_get_obs(agent))
-            return obs
-    else:
-        if env.args.multiprocessing:
-            pool = mp.Pool(processes=cores)
-            obs = pool.map(_get_all, agents.values())
-            pool.close()
-            pool.join()
-            #obs.extend(prey_obs)
-        else:
-            obs = []
-            for agent in agents.values():
-                obs.append(_get_all(agent))
-
-    obs, killed = zip(*obs)
-    killed = dict(killed)
-
-    global _killed
-    _killed = killed
-    if env.args.multiprocessing:
-        pool = mp.Pool(processes=cores)
-        rewards = pool.map(_get_reward, agents.values())
-        pool.close()
-        pool.join()
-    else:
-        rewards = []
-        for agent in agents.values():
-            reward = _get_reward(agent)
-
-    for id, killed_agent in killed.items():
-        if killed_agent is not None:
-            env.increase_health(agents[id])
-    killed = list(killed.values())
-
-    return obs, dict(rewards), killed
-
-
-
-def _get_all(agent):
-    x, y = agent.pos
-    obs = np.zeros((4+agent_emb_dim, vision_width, vision_height))
-    obs[4:, vision_width//2, vision_height//2] = agent_embeddings[agent.id]
-    vision_x = x-vision_width//2
-    vision_y = y-vision_height//2
-    if vision_x < 0:
-        vision_x = w+vision_x
-    if vision_y < 0:
-        vision_y = h+vision_y
-
-    for i in range(vision_width):
-        for j in range(vision_height):
-            x_coord = vision_x + i
-            y_coord = vision_y + j
-            if x_coord < 0:
-                x_coord = w+x_coord
-            if y_coord < 0:
-                y_coord = h+y_coord
-
-            if x_coord >= w:
-                x_coord = x_coord - w
-            if y_coord >= h:
-                y_coord = y_coord - h
-
-            if _map[x_coord][y_coord] > 0:
-                other_agent = agents_dict[_map[x_coord][y_coord]]
-                obs[:3, i, j] = other_agent.property[1]
-                obs[3, i, j] = other_agent.health
-            elif _map[x_coord][y_coord] == -1:
-                obs[:3, i, j] = 1.
-            else:
-                obs[:3, i, j] = _property[0][1]
-
-    if agent.predator:
-        killed = _get_killed(agent)
-    else:
-        killed = (agent.id, None)
-
-    if obs_type == 'dense':
-        return (agent.id, obs[:4].reshape(-1)), killed
-    else:
-        return (agent.id, obs), killed
-
-
-def get_obs(env, only_view=False):
-    global agent_emb_dim
-    agent_emb_dim = env.agent_emb_dim
-    global vision_width
-    vision_width = env.vision_width
-    global vision_height
-    vision_height = env.vision_height
-    global agent_embeddings
-    agent_embeddings = env.agent_embeddings
-    global agents
-    agents = env.agents
-
-    global agents_dict
-    agents_dict = env.agents
-
-    global cpu_cores
-    cpu_cores = env.cpu_cores
-    global h
-    h = env.h
-    global w
-    w = env.w
-    global _map
-    _map = env.map
-    global _property
-    _property = env.property
-    global obs_type
-    obs_type = env.obs_type
-
-
-    if env.cpu_cores is None:
-        cores = mp.cpu_count()
-    else:
-        cores = cpu_cores
-
     if env.args.multiprocessing:
         pool = mp.Pool(processes=cores)
         obs = pool.map(_get_obs, agents.values())
         pool.close()
         pool.join()
     else:
+        obs = []
         for agent in agents.values():
             obs.append(_get_obs(agent))
 
@@ -865,6 +740,7 @@ def _get_obs(agent):
             else:
                 obs[:3, i, j] = _property[0][1]
 
+
     if obs_type == 'dense':
         return (agent.id, obs[:4].reshape(-1))
     else:
@@ -911,7 +787,6 @@ def _get_killed(agent, killed):
     if target_prey is not None:
         killed_id = target_prey.id
     return (agent.id, killed_id)
-
 
 
 def _get_reward(agent):
