@@ -767,7 +767,7 @@ def get_obs(env, only_view=False):
 
 def _get_obs(agent):
     x, y = agent.pos
-    obs = np.ones((4+agent_emb_dim, vision_width, vision_height))
+    obs = np.zeros((4+agent_emb_dim, vision_width, vision_height))
     obs[:3, :, :] = np.broadcast_to(np.array(_property[0][1]).reshape((3, 1, 1)), (3, vision_width, vision_height))
     obs[4:, vision_width//2, vision_height//2] = agent_embeddings[agent.id]
     local_map = large_map[(w+x-vision_width//2):(w+x-vision_width//2+vision_width), (h+y-vision_height//2):(h+y-vision_height//2+vision_height)]
