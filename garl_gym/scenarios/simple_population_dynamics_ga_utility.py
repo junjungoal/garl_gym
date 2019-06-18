@@ -724,7 +724,7 @@ def get_obs(env, only_view=False):
     else:
         cores = cpu_cores
 
-    if env.args.multiprocessing:
+    if env.args.multiprocessing and len(agents)>7000:
         pool = mp.Pool(processes=cores)
         obs = pool.map(_get_obs, agents.values())
         pool.close()
@@ -746,7 +746,7 @@ def get_obs(env, only_view=False):
     global _killed
     _killed = killed
 
-    if env.args.multiprocessing:
+    if env.args.multiprocessing and len(agents)>7000:
         pool = mp.Pool(processes=cores)
         rewards = pool.map(_get_reward, agents.values())
         pool.close()
