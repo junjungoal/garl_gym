@@ -756,6 +756,80 @@ def _get_all(agent):
         return (agent.id, obs), killed
 
 
+def get_obs(env, only_view=False):
+    global agent_emb_dim
+    agent_emb_dim = env.agent_emb_dim
+    global vision_width
+    vision_width = env.vision_width
+    global vision_height
+    vision_height = env.vision_height
+    global agent_embeddings
+    agent_embeddings = env.agent_embeddings
+    global agents
+    agents = env.agents
+
+    global agents_dict
+    agents_dict = env.agents
+
+    global cpu_cores
+    cpu_cores = env.cpu_cores
+    global h
+    h = env.h
+    global w
+    w = env.w
+    global _map
+    _map = env.map
+    global _property
+    _property = env.property
+    global obs_type
+    obs_type = env.obs_type
+
+
+    if env.cpu_cores is None:
+        cores = mp.cpu_count()
+    else:
+        cores = cpu_cores
+
+    if env.args.multiprocessing:
+        pool = mp.Pool(processes=cores)
+        obs = pool.map(_get_obs, agents.values())
+        pool.close()
+        pool.join()
+    else:
+        for agent in agents.values():
+            obs.append(_get_obs(agent))
+
+    if only_view:
+        return obs
+
+    killed = []
+    for agent in agents.values():
+        killed.append(_get_killed(agent, killed))
+
+    killed = dict(killed)
+
+    global _killed
+    _killed = killed
+
+    if env.args.multiprocessing:
+        pool = mp.Pool(processes=cores)
+        rewards = pool.map(_get_reward, agents.values())
+        pool.close()
+        pool.join()
+    else:
+        rewards = []
+        for agent in agents.values():
+            reward = _get_reward(agent)
+
+    for id, killed_agent in killed.items():
+        if killed_agent is not None:
+            env.increase_health(agents[id])
+    killed = list(killed.values())
+
+    return obs, dict(rewards), killed
+
+
+
 def _get_obs(agent):
     x, y = agent.pos
     obs = np.zeros((4+agent_emb_dim, vision_width, vision_height))
@@ -796,7 +870,9 @@ def _get_obs(agent):
     else:
         return (agent.id, obs)
 
-def _get_killed(agent):
+def _get_killed(agent, killed):
+    if not agent.predator:
+        return (agent.id, None)
     x, y = agent.pos
     min_dist = np.inf
     target_prey = None
@@ -825,7 +901,7 @@ def _get_killed(agent):
                 y_coord = y_coord - h
             if _map[x_coord][y_coord] > 0:
                 candidate_agent = agents_dict[_map[x_coord, y_coord]]
-                if not candidate_agent.predator:
+                if not candidate_agent.predator and not candidate_agent.id in dict(killed).values():
                     x_prey, y_prey = candidate_agent.pos
                     dist = np.sqrt((x-x_prey)**2+(y-y_prey)**2)
                     if dist < min_dist:
@@ -835,6 +911,7 @@ def _get_killed(agent):
     if target_prey is not None:
         killed_id = target_prey.id
     return (agent.id, killed_id)
+
 
 
 def _get_reward(agent):
