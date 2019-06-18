@@ -642,8 +642,6 @@ def get_obs(env, only_view=False):
     global agents
     agents = env.agents
 
-    global agents_dict
-    agents_dict = env.agents
 
     global cpu_cores
     cpu_cores = env.cpu_cores
@@ -657,7 +655,11 @@ def get_obs(env, only_view=False):
     _property = env.property
     global obs_type
     obs_type = env.obs_type
-
+    global large_map
+    large_map = np.zeros((w*3, h*3), dtype=np.int32)
+    for i in range(3):
+        for j in range(3):
+            large_map[w*i:w*(i+1), h*j:h*(j+1)] = _map
 
     if env.cpu_cores is None:
         cores = mp.cpu_count()
@@ -707,38 +709,25 @@ def get_obs(env, only_view=False):
 
 def _get_obs(agent):
     x, y = agent.pos
-    obs = np.zeros((4+agent_emb_dim, vision_width, vision_height))
+    obs = np.ones((4+agent_emb_dim, vision_width, vision_height))
+    obs[:3, :, :] = np.broadcast_to(np.array(_property[0][1]).reshape((3, 1, 1)), (3, vision_width, vision_height))
     obs[4:, vision_width//2, vision_height//2] = agent_embeddings[agent.id]
-    vision_x = x-vision_width//2
-    vision_y = y-vision_height//2
+    local_map = large_map[(w+x-vision_width//2):(w+x-vision_width//2+vision_width), (h+y-vision_height//2):(h+y-vision_height//2+vision_height)]
+    agent_indices = np.where(local_map!=0)
+    if len(agent_indices[0]) == 0:
+        if obs_type == 'dense':
+            return (agent.id, obs[:4].reshape(-1))
+        else:
+            return (agent.id, obs)
+    for other_x, other_y in zip(agent_indices[0], agent_indices[1]):
+        id_ = local_map[other_x, other_y]
 
-    if vision_x < 0:
-        vision_x = w+vision_x
-    if vision_y < 0:
-        vision_y = h+vision_y
-
-    for i in range(vision_width):
-        for j in range(vision_height):
-            x_coord = vision_x + i
-            y_coord = vision_y + j
-            if x_coord < 0:
-                x_coord = w+x_coord
-            if y_coord < 0:
-                y_coord = h+y_coord
-
-            if x_coord >= w:
-                x_coord = x_coord - w
-            if y_coord >= h:
-                y_coord = y_coord - h
-
-            if _map[x_coord][y_coord] > 0:
-                other_agent = agents_dict[_map[x_coord][y_coord]]
-                obs[:3, i, j] = other_agent.property[1]
-                obs[3, i, j] = other_agent.health
-            elif _map[x_coord][y_coord] == -1:
-                obs[:3, i, j] = 1.
-            else:
-                obs[:3, i, j] = _property[0][1]
+        if id_ == -1:
+            obs[:3, other_x, other_y] = 1.
+        else:
+            other_agent = agents[local_map[other_x, other_y]]
+            obs[:3, other_x, other_y] = other_agent.property[1]
+            obs[3, other_x, other_y] = other_agent.health
 
 
     if obs_type == 'dense':
@@ -754,35 +743,21 @@ def _get_killed(agent, killed):
     target_prey = None
     killed_id = None
 
-    hunt_x = x-agent.hunt_square//2
-    hunt_y = y-agent.hunt_square//2
+    local_map = large_map[(w+x-agent.hunt_square//2):(w+x-agent.hunt_square//2+agent.hunt_square), (h+y-agent.hunt_square//2):(h+y-agent.hunt_square//2+agent.hunt_square)]
+    agent_indices = np.where(local_map>0)
 
-    if hunt_x < 0:
-        hunt_x = w+hunt_x
-    if hunt_y < 0:
-        hunt_y = h+hunt_y
+    if len(agent_indices[0]) == 0:
+        return (agent.id, None)
+    for candidate_x, candidate_y in zip(agent_indices[0], agent_indices[1]):
+        id_ = local_map[candidate_x, candidate_y]
+        candidate_agent = agents[id_]
 
-    for i in range(agent.hunt_square):
-        for j in range(agent.hunt_square):
-            x_coord = hunt_x + i
-            y_coord = hunt_y + j
-            if x_coord < 0:
-                x_coord = w+x_coord
-            if y_coord < 0:
-                y_coord = h+y_coord
-
-            if x_coord >= w:
-                x_coord = x_coord - w
-            if y_coord >= h:
-                y_coord = y_coord - h
-            if _map[x_coord][y_coord] > 0:
-                candidate_agent = agents_dict[_map[x_coord, y_coord]]
-                if not candidate_agent.predator and not candidate_agent.id in dict(killed).values():
-                    x_prey, y_prey = candidate_agent.pos
-                    dist = np.sqrt((x-x_prey)**2+(y-y_prey)**2)
-                    if dist < min_dist:
-                        min_dist = dist
-                        target_prey = candidate_agent
+        if not candidate_agent.predator and not candidate_agent.id in dict(killed).values():
+            x_prey, y_prey = candidate_agent.pos
+            dist = np.sqrt((x-x_prey)**2+(y-y_prey)**2)
+            if dist < min_dist:
+                min_dist = dist
+                target_prey = candidate_agent
 
     if target_prey is not None:
         killed_id = target_prey.id
