@@ -314,7 +314,7 @@ class SimplePopulationDynamicsGAUtility(BaseEnv):
                 child.physical = (one.physical + two.physical) / 2.
             child.health = 1
             child.hunt_square = self.max_hunt_square
-            child.property = [self._gen_power(child.id), [0, 0, 1]]
+            child.property = [self._gen_power(child.id), [1, 0, 0]]
             x = ind[0][perm[i]]
             y = ind[1][perm[i]]
             self.map[x][y] = child.id
