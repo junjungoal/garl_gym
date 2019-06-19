@@ -888,7 +888,6 @@ def _get_reward(agent):
             reward += 1
 
         if agent.crossover:
-            print('crossover')
             reward += 1
 
         if agent.health <= 0:
@@ -898,7 +897,6 @@ def _get_reward(agent):
         if agent.id in _killed.values():
             reward -= 1
         if agent.crossover:
-            print('crossover')
             reward += 1
         #else:
         #    reward += 0.2
