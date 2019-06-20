@@ -52,6 +52,10 @@ class Agent(object):
         self.liking = None
         self.physical = None
         self.environmental_condition = None
+        self.w_eating = None
+        self.w_mating = None
+        self.w_moving = None
+
     def utility(self):
         if self.predator:
             return (self.physical + self.environmental_condition)**self.liking

@@ -14,7 +14,7 @@ import gc
 from garl_gym.core import DiscreteWorld, Agent
 
 
-class SimplePopulationDynamics(BaseEnv):
+class SimplePopulationDynamicsRuleBase(BaseEnv):
     '''
     args:
         - height
@@ -289,14 +289,49 @@ class SimplePopulationDynamics(BaseEnv):
 
 
 
-    def take_actions(self, actions):
-        for id, action in actions.items():
-            agent = self.agents[id]
+    def take_actions(self):
+        large_map = np.zeros((self.w*3, self.h*3))
+        for i in range(3):
+            for j in range(3):
+                large_map[self.w*i:self.w*(i+1), self.h*j:self.h*(j+1)] = self.map
+        for id, agent in self.agents.items():
+            x, y = agent.pos
+            local_map = large_map[(self.w+x-self.vision_width//2):(self.w+x-self.vision_width//2+self.vision_width), (self.h+y-self.vision_height//2):(self.h+y-self.vision_height//2+self.vision_height)]
+
+            agent_indices = np.where(local_map>0)
+
+            coord_opponent = []
+            coord_ally = []
+            for candidate_x, candidate_y in zip(agent_indices[0], agent_indices[1]):
+                candidate_agent = self.agents[local_map[candidate_x, candidate_y]]
+                if candidate_agent.id == agent.id:
+                    # skip if a candidate agent is the same as the target agent
+                    continue
+
+                if candidate_agent.predator == agent.predator:
+                    coord_ally.append((candidate_x, candidate_y))
+                else:
+                    coord_opponent.append((candidate_x, candidate_y))
+
+            dist_values = []
+            for diff_x, diff_y in [(-1, 0), (1, 0), (0, -1), (0, 1), (0, 0)]: # 5 Actions in total
+                new_x = self.vision_width//2. + diff_x
+                new_y = self.vision_height//2. + diff_y
+                new_dist_oppo = 0
+                new_dist_ally = 0
+                for oppo_x, oppo_y in coord_opponent:
+                    new_dist_oppo += (new_x-oppo_x)**2 + (new_y-oppo_y)**2
+
+                for ally_x, ally_y in coord_ally:
+                    new_dist_ally += (new_x-ally_x)**2 + (new_y-ally_y)**2
+
+                dist_values.append(new_dist_oppo-new_dist_ally)  # negative of dist for ally
+            action = np.argmax(dist_values)
+
+            self._take_action(agent, action)
             if agent.predator:
-                self._take_action(agent, action)
                 self.decrease_health(agent)
-            else:
-                self._take_action(agent, action)
+
 
     def _take_action(self, agent, action):
         def in_board(x, y):
@@ -342,6 +377,8 @@ class SimplePopulationDynamics(BaseEnv):
                 new_x = x
                 if in_board(new_x, new_y):
                     agent.pos = (new_x, new_y)
+        elif action == 4:
+            next
         else:
             print('Wrong action id')
 
@@ -433,121 +470,14 @@ class SimplePopulationDynamics(BaseEnv):
         self.killed = []
         return killed
 
-    def render(self, only_view=False):
-        if self.cpu_cores is None:
-            cores = mp.cpu_count()
-        else:
-            cores = self.cpu_cores
-
-        if self.args.multiprocessing:
-            pool = mp.Pool(processes=cores)
-            if only_view:
-                obs = pool.map(self._get_obs, self.agents.values())
-            else:
-                obs = pool.map(self._get_all, self.agents.values())
-            pool.close()
-            pool.join()
-        else:
-            obs = []
-            if only_view:
-                for agent in self.agents.values():
-                    obs.append(self._get_obs(agent))
-            else:
-                for agent in self.agents.values():
-                    obs.append(self._get_all(agent))
-        return obs
-
     def reset(self):
         self.__init__(self.args)
         self.agent_embeddings = {}
         self.make_world(wall_prob=self.args.wall_prob, wall_seed=self.args.wall_seed, food_prob=self.args.food_prob)
 
-        return self.render()
+        return get_obs(self, only_view=True)
 
-    def step(self, actions):
-        self.timestep += 1
-        for agent in self.agents:
-            x, y = agent.pos
-            vision_x = x-self.vision_width
-            vision_y = y-self.vision_height
-
-            if vision_x < 0:
-                vision_x = self.w+vision_x
-            if vision_y < 0:
-                vision_y = self.h + vision_y
-
-            coord_opponent = []
-            coord_ally = []
-            dist_opponent = 0
-            dist_ally = 0
-            for i in range(self.vision_width):
-                for j in range(self.vision_height):
-                    x_coord = vision_x+i
-                    y_coord = vision_y+j
-
-                    if x_coord < 0:
-                        x_coord = self.w+x_coord
-                    if y_coord < 0:
-                        y_coord = self.h+y_coord
-
-                    if x_coord >= self.w:
-                        x_coord = x_coord - self.w
-                    if y_coord >= self.h:
-                        y_coord = y_coord - self.h
-
-                    if self.map[x_coord][y_coord]>0:
-                        target_agent = self.map[x_coord][y_coord]
-                        if target_agent.predator == agent.predator:
-                            coord_ally.append((i, j))
-                            dist_ally += (i-self.vision_width//2.)**2 + (j-self.vision_height//2.)
-                        else:
-                            coord_opponent.append((i, j))
-                            dist_opponent += (i-self.vision_width//2.)**2 + (j-self.vision_height//2.)
-
-            dist_max_oppo = 0
-            dist_min_ally = 0
-            best_action_oppo = None
-            best_action_ally = None
-            for diff_x, diff_y in [(0, 1), (1, 0), (-1, 0), (0, -1)]:
-                new_x = self.vision_width//2. + diff_x
-                new_y = self.vision_height//2. + diff_y
-                new_dist_oppo = 0
-                new_dist_ally = 0
-                for oppo_x, oppo_y in coord_opponent:
-                    new_dist_oppo += (new_x-oppo_x)**2 + (new_y-oppo_y)**2
-                if new_dist_oppo > dist_max_oppo:
-                    dist_max_oppo = new_dist_oppo
-                    best_action_oppo = (diff_x, diff_y)
-
-                for ally_x, ally_y in coord_ally:
-                    new_dist_ally += (new_x-ally_x)**2 + (new_y-ally_y)**2
-                if new_dist_ally < dist_min_ally:
-                    dist_min_ally = new_dist_ally
-                    best_action_ally = (diff_x, diff_y)
-                    #best_action_ally = 
-                    #best_action_ally = 
-                    #best_action_ally = 
-                    #best_action_ally = 
-
-            
-
-
-
-
-        self.take_actions(actions)
-        rewards = {}
-
-        obs, rewards, killed = zip(*self.render())
-        self.killed = list(dict(killed).values())
-        for id, killed in killed:
-            if killed is not None:
-                self.increase_health(self.agents[id])
-        return obs, dict(rewards)
-
-
-def get_obs(env, only_view=False, predator_obs=None, prey_obs=None):
-    if predator_obs == True and prey_obs == True:
-        raise ValueError('Either predator_obs or prey_obs has to be False')
+def get_obs(env, only_view=False):
     global agent_emb_dim
     agent_emb_dim = env.agent_emb_dim
     global vision_width
@@ -557,15 +487,8 @@ def get_obs(env, only_view=False, predator_obs=None, prey_obs=None):
     global agent_embeddings
     agent_embeddings = env.agent_embeddings
     global agents
-    if predator_obs == True:
-        agents = env.predators
-    elif prey_obs == True:
-        agents = env.preys
-    else:
-        agents = env.agents
+    agents = env.agents
 
-    global agents_dict
-    agents_dict = env.agents
 
     global cpu_cores
     cpu_cores = env.cpu_cores
@@ -579,125 +502,135 @@ def get_obs(env, only_view=False, predator_obs=None, prey_obs=None):
     _property = env.property
     global obs_type
     obs_type = env.obs_type
-
+    global large_map
+    large_map = np.zeros((w*3, h*3), dtype=np.int32)
+    for i in range(3):
+        for j in range(3):
+            large_map[w*i:w*(i+1), h*j:h*(j+1)] = _map
 
     if env.cpu_cores is None:
         cores = mp.cpu_count()
     else:
         cores = cpu_cores
 
-    if env.args.multiprocessing:
+    if env.args.multiprocessing and len(agents)>6000:
         pool = mp.Pool(processes=cores)
-        if only_view:
-            obs = pool.map(_get_obs, agents.values())
-            pool.close()
-            pool.join()
-            return obs
-        else:
-            obs = pool.map(_get_all, agents.values())
+        obs = pool.map(_get_obs, agents.values())
         pool.close()
         pool.join()
     else:
         obs = []
-        if only_view:
-            for agent in agents.values():
-                obs.append(_get_obs(agent))
-            return obs
-        else:
-            for agent in agents.values():
-                obs.append(_get_all(agent))
+        for agent in agents.values():
+            obs.append(_get_obs(agent))
 
-    obs, rewards, killed = zip(*obs)
-    #killed = list(dict(killed).values())
-    for id, killed_agent in killed:
+    if only_view:
+        return obs
+
+    killed = []
+    for agent in agents.values():
+        killed.append(_get_killed(agent, killed))
+
+    killed = dict(killed)
+
+    global _killed
+    _killed = killed
+
+    if env.args.multiprocessing and len(agents)>6000:
+        pool = mp.Pool(processes=cores)
+        rewards = pool.map(_get_reward, agents.values())
+        pool.close()
+        pool.join()
+    else:
+        rewards = []
+        for agent in agents.values():
+            reward = _get_reward(agent)
+
+    for id, killed_agent in killed.items():
         if killed_agent is not None:
             env.increase_health(agents[id])
-    killed = list(dict(killed).values())
+    killed = list(killed.values())
 
     return obs, dict(rewards), killed
 
 
 
-def _get_all(agent):
-    x, y = agent.pos
-    obs = np.zeros((4+agent_emb_dim, vision_width, vision_height))
-    obs[4:, vision_width//2, vision_height//2] = agent_embeddings[agent.id]
-    vision_x = x-vision_width//2
-    vision_y = y-vision_height//2
-
-    if vision_x < 0:
-        vision_x = w+vision_x
-    if vision_y < 0:
-        vision_y = h+vision_y
-
-    for i in range(vision_width):
-        for j in range(vision_height):
-            x_coord = vision_x + i
-            y_coord = vision_y + j
-            if x_coord < 0:
-                x_coord = w+x_coord
-            if y_coord < 0:
-                y_coord = h+y_coord
-
-            if x_coord >= w:
-                x_coord = x_coord - w
-            if y_coord >= h:
-                y_coord = y_coord - h
-
-            if _map[x_coord][y_coord] > 0:
-                other_agent = agents_dict[_map[x_coord][y_coord]]
-                obs[:3, i, j] = other_agent.property[1]
-                obs[3, i, j] = other_agent.health
-            elif _map[x_coord][y_coord] == -1:
-                obs[:3, i, j] = 1.
-            else:
-                obs[:3, i, j] = _property[0][1]
-
-    rewards, killed = _get_reward(agent)
-
-    if obs_type == 'dense':
-        return (agent.id, obs[:4].reshape(-1)), rewards, killed
-    else:
-        return (agent.id, obs), rewards, killed
-
-
 def _get_obs(agent):
     x, y = agent.pos
     obs = np.zeros((4+agent_emb_dim, vision_width, vision_height))
+    obs[:3, :, :] = np.broadcast_to(np.array(_property[0][1]).reshape((3, 1, 1)), (3, vision_width, vision_height))
     obs[4:, vision_width//2, vision_height//2] = agent_embeddings[agent.id]
-    vision_x = x-vision_width//2
-    vision_y = y-vision_height//2
+    local_map = large_map[(w+x-vision_width//2):(w+x-vision_width//2+vision_width), (h+y-vision_height//2):(h+y-vision_height//2+vision_height)]
+    agent_indices = np.where(local_map!=0)
+    if len(agent_indices[0]) == 0:
+        if obs_type == 'dense':
+            return (agent.id, obs[:4].reshape(-1))
+        else:
+            return (agent.id, obs)
+    for other_x, other_y in zip(agent_indices[0], agent_indices[1]):
+        id_ = local_map[other_x, other_y]
 
-    if vision_x < 0:
-        vision_x = w+vision_x
-    if vision_y < 0:
-        vision_y = h+vision_y
+        if id_ == -1:
+            obs[:3, other_x, other_y] = 1.
+        else:
+            other_agent = agents[local_map[other_x, other_y]]
+            obs[:3, other_x, other_y] = other_agent.property[1]
+            obs[3, other_x, other_y] = other_agent.health
 
-    for i in range(vision_width):
-        for j in range(vision_height):
-            x_coord = vision_x + i
-            y_coord = vision_y + j
-            if x_coord < 0:
-                x_coord = w+x_coord
-            if y_coord < 0:
-                y_coord = h+y_coord
-
-            if x_coord >= w:
-                x_coord = x_coord - w
-            if y_coord >= h:
-                y_coord = y_coord - h
-
-            if _map[x_coord][y_coord] > 0:
-                other_agent = agents_dict[_map[x_coord][y_coord]]
-                obs[:3, i, j] = other_agent.property[1]
-                obs[3, i, j] = other_agent.health
-            elif _map[x_coord][y_coord] == -1:
-                obs[:3, i, j] = 1.
-            else:
-                obs[:3, i, j] = _property[0][1]
 
     if obs_type == 'dense':
         return (agent.id, obs[:4].reshape(-1))
     else:
         return (agent.id, obs)
+
+def _get_killed(agent, killed):
+    if not agent.predator:
+        return (agent.id, None)
+    x, y = agent.pos
+    min_dist = np.inf
+    target_prey = None
+    killed_id = None
+
+    local_map = large_map[(w+x-agent.hunt_square//2):(w+x-agent.hunt_square//2+agent.hunt_square), (h+y-agent.hunt_square//2):(h+y-agent.hunt_square//2+agent.hunt_square)]
+    agent_indices = np.where(local_map>0)
+
+    if len(agent_indices[0]) == 0:
+        return (agent.id, None)
+    for candidate_x, candidate_y in zip(agent_indices[0], agent_indices[1]):
+        id_ = local_map[candidate_x, candidate_y]
+        candidate_agent = agents[id_]
+
+        if not candidate_agent.predator and not candidate_agent.id in dict(killed).values():
+            x_prey, y_prey = candidate_agent.pos
+            dist = np.sqrt((x-x_prey)**2+(y-y_prey)**2)
+            if dist < min_dist:
+                min_dist = dist
+                target_prey = candidate_agent
+
+    if target_prey is not None:
+        killed_id = target_prey.id
+    return (agent.id, killed_id)
+
+
+
+def _get_reward(agent):
+    reward = 0
+    if agent.predator:
+        if _killed[agent.id] is not None:
+            reward += 1
+
+        if agent.crossover:
+            reward += 1
+
+        if agent.health <= 0:
+            reward -= 1
+    else:
+        if agent.id in _killed.values():
+            reward -= 1
+        if agent.crossover:
+            reward += 1
+        #else:
+        #    reward += 0.2
+
+    return (agent.id, reward)
+
 
