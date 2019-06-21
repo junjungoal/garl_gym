@@ -85,6 +85,9 @@ class SimplePopulationDynamicsGA(BaseEnv):
 
         self.cpu_cores = args.cpu_cores
 
+        self.increase_preys = 0
+        self.increase_predators = 0
+
 
 
     #@property
@@ -199,39 +202,6 @@ class SimplePopulationDynamicsGA(BaseEnv):
         self.property[-1] = [1, [0, 0, 0]]
         self.property[0] = [1, [0.411, 0.411, 0.411]]
 
-    def _gen_power(self, cnt):
-        def max_view_size(view_size1, view_size2):
-            view_size_area1 = (2*view_size1[0]+1) * (view_size1[1]+1)
-            view_size_area2 = (2*view_size2[0]+1) * (view_size2[1]+1)
-            return view_size1 if view_size_area1 > view_size_area2 else view_size2
-
-        def min_view_size(view_size1, view_size2):
-            view_size_area1 = (2*view_size1[0]+1) * (view_size1[1]+1)
-            view_size_area2 = (2*view_size2[0]+1) * (view_size2[1]+1)
-            return view_size1 if view_size_area1 < view_size_area2 else view_size2
-
-        cur = 0
-        if self.view_args is None:
-            return [5, 5, 0]
-        for k in self.view_args:
-            k = [int(x) for x in k.split('-')]
-            assert len(k) == 4
-            num, power_list = k[0], k[1:]
-            # Maintain the max_view_size
-            if self.max_view_size is None:
-                self.max_view_size = power_list
-            else:
-                self.max_view_size = max_view_size(self.max_view_size, power_list)
-
-            if self.min_view_size is None:
-                self.min_view_size = power_list
-            else:
-                self.min_view_size = min_view_size(self.min_view_size, power_list)
-
-            cur += num
-
-            if cnt <= cur:
-                return power_list
 
     def increase_food(self, prob):
         num = max(1, int(self.num_food * prob))
@@ -289,8 +259,9 @@ class SimplePopulationDynamicsGA(BaseEnv):
                         self.predators[child.id] = child
                         self.predator_num += 1
                         ### decrease health?
-                        #candidate_agent.health -= 0.5
-                        #predator.health -= -0.5
+                        candidate_agent.health -= 0.2
+                        predator.health -= 0.2
+                        self.increase_predators += 1
 
     def crossover_prey(self, crossover_scope=3, crossover_rate=0.001):
         large_map = np.zeros((w*3, h*3), dtype=np.int32)
@@ -335,175 +306,9 @@ class SimplePopulationDynamicsGA(BaseEnv):
                         child.pos = (x, y)
                         self.preys[child.id] = child
                         self.prey_num += 1
-
-    def increase_predator(self, prob):
-        num = max(1, int(len(self.predators) * prob))
-        ind = np.where(self.map == 0)
-        perm = np.random.permutation(np.arange(len(ind[0])))
-
-        for i in range(num):
-            agent = Agent()
-            agent.health = 1
-            agent.original_health = 1
-            agent.birth_time = self.timestep
-            agent.predator = True
-
-            agent.id = self.max_id
-            self.max_id += 1
-            agent.speed = 1
-            agent.hunt_square = self.max_hunt_square
-            agent.property = [self._gen_power(agent.id), [0, 0, 1]]
-            x = ind[0][perm[i]]
-            y = ind[1][perm[i]]
-            if self.map[x][y] == 0:
-                self.map[x][y] = agent.id
-                agent.pos = (x, y)
-            self.predators[agent.id] = agent
-            new_embedding = np.random.normal(size=[self.agent_emb_dim])
-            self.agent_embeddings[agent.id] = new_embedding
-
-    def increase_prey(self, prob):
-        num = max(1, int(len(self.preys) * prob))
-        ind = np.where(self.map == 0)
-        perm = np.random.permutation(np.arange(len(ind[0])))
-        for i in range(num):
-            agent = Agent()
-            agent.health = 1
-            agent.original_health = 1
-            agent.birth_time = self.timestep
-            agent.predator = False
-
-            agent.id = self.max_id
-            self.max_id += 1
-            agent.property = [self._gen_power(agent.id), [1, 0, 0]]
-            x = ind[0][perm[i]]
-            y = ind[1][perm[i]]
-            if self.map[x][y] == 0:
-                self.map[x][y] = agent.id
-                agent.pos = (x, y)
-            self.preys[agent.id] = agent
-            new_embedding = np.random.normal(size=[self.agent_emb_dim])
-            self.agent_embeddings[agent.id] = new_embedding
-
-
-
-    def take_actions(self, actions):
-        for id, agent in self.agents.items():
-            if agent.predator:
-                self._take_action(agent, actions[id])
-                self.decrease_health(agent)
-            else:
-                self._take_action(agent, actions[id])
-
-    def _take_action(self, agent, action):
-        def in_board(x, y):
-            return not (x < 0 or x >= self.h or y < 0 or y >= self.w) and self.map[x][y] == 0
-        x, y = agent.pos
-        if action == 0:
-            new_x = x - 1
-            new_y = y
-            if in_board(new_x, new_y):
-                agent.pos = (new_x, new_y)
-            elif new_x < 0:
-                new_x = self.h-1
-                new_y = y
-                if in_board(new_x, new_y):
-                    agent.pos = (new_x, new_y)
-        elif action == 1:
-            new_x = x + 1
-            new_y = y
-            if in_board(new_x, new_y):
-                agent.pos = (new_x, new_y)
-            elif new_x >= self.h:
-                new_x = 0
-                new_y = y
-                if in_board(new_x, new_y):
-                    agent.pos = (new_x, new_y)
-        elif action == 2:
-            new_x = x
-            new_y = y - 1
-            if in_board(new_x, new_y):
-                agent.pos = (new_x, new_y)
-            elif new_y < 0:
-                new_x = x
-                new_y = self.w-1
-                if in_board(new_x, new_y):
-                    agent.pos = (new_x, new_y)
-        elif action == 3:
-            new_x = x
-            new_y = y + 1
-            if in_board(new_x, new_y):
-                agent.pos = (new_x, new_y)
-            elif new_y >= self.w:
-                new_y = 0
-                new_x = x
-                if in_board(new_x, new_y):
-                    agent.pos = (new_x, new_y)
-        else:
-            print('Wrong action id')
-
-        new_x, new_y = agent.pos
-        self.map[x][y] = 0
-        self.map[new_x][new_y] = agent.id
-
-
-
-        ## Exclude Grouping
-
-    def decrease_health(self, agent):
-        #for i in range(self.predator_num):
-        #for i in range(len(self.agents)):
-            #self.agents[i].health -= self.args.damage_per_step
-        agent.health -= self.args.damage_per_step
-
-    def increase_health(self, agent):
-        if hasattr(self.args, 'health_increase_rate') and self.args.health_increase_rate is not None:
-            agent.health += self.args.health_increase_rate
-        else:
-            agent.health += 1.
-
-
-    def dump_image(self, img_name):
-        new_w, new_h = self.w * 5, self.h * 5
-        img = np.zeros((new_w, new_h, 3), dtype=np.uint8)
-        length = self.args.img_length
-        for i in range(self.h):
-            for j in range(self.w):
-                id = self.map[i][j]
-                if self.food_map[i][j] == -2: img[(i*length-1):(i+1)*length, (j*length-1):(j+1)*length, :] = 255*np.array(self.property[-2][1])
-                elif id == 0:
-                    img[(i*length-1):(i+1)*length, (j*length-1):(j+1)*length, :] = 255
-                elif id == -1:
-                    img[(i*length-1):(i+1)*length, (j*length-1):(j+1)*length, :] = 255*np.array(self.property[id][1])
-                else:
-                    # prey
-                    agent = self.agents[id]
-                    img[(i*length-1):(i+1)*length, (j*length-1):(j+1)*length, :] = 255*np.array(agent.property[1])
-
-        #for predator in self.predators.values():
-        #    x, y = predator.pos
-        #    img[(x*length-1):(x+1)*length, (y*length-1):(y+1)*length, :] = 255 * np.array(predator.property[1])
-        output_img = Image.fromarray(img, 'RGB')
-        output_img.save(img_name)
-
-    def convert_img(self):
-        img = np.zeros((self.h, self.w, 3))
-        for i in range(self.h):
-            for j in range(self.w):
-                id = self.map[i][j]
-                if self.food_map[i][j] == -2:
-                    img[i, j, :] = 255*np.array(self.property[-2][1])
-                elif id <= 0 and id > -2:
-                    img[i, j, :] = 255*np.array(self.property[id][1])
-                else:
-                    # prey
-                    img[i, j, :] = 255*np.array(self.property[-3][1])
-
-        for predator in self.predators.values():
-            x, y = predator.pos
-            img[x, y, :] = 255*np.array(predator.property[1])
-        return img
-
+                        candidate_agent.health -= 0.2
+                        prey.health -= 0.2
+                        self.increase_preys += 1
 
     def remove_dead_agents(self):
         killed = []
@@ -538,6 +343,8 @@ class SimplePopulationDynamicsGA(BaseEnv):
                 agent.age += 1
                 agent.crossover=False
         self.killed = []
+        self.increase_predators = 0
+        self.increase_preys = 0
         return killed
 
     def remove_dead_agent_emb(self, dead_list):
@@ -632,6 +439,7 @@ def get_obs(env, only_view=False):
         rewards = []
         for agent in agents.values():
             reward = _get_reward(agent)
+            rewards.append(reward)
 
     for id, killed_agent in killed.items():
         if killed_agent is not None:
@@ -707,7 +515,7 @@ def _get_reward(agent):
             reward += 1
 
         if agent.crossover:
-            reward += 1
+            reward += 1.5
 
         if agent.health <= 0:
             reward -= 1
@@ -715,7 +523,7 @@ def _get_reward(agent):
         if agent.id in _killed.values():
             reward -= 1
         if agent.crossover:
-            reward += 1
+            reward += 0.5
         #else:
         #    reward += 0.2
 

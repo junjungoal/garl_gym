@@ -55,6 +55,7 @@ class Agent(object):
         self.w_eating = None
         self.w_mating = None
         self.w_moving = None
+        self.fail_crossover = False
 
     def utility(self):
         if self.predator:
