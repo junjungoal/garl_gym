@@ -87,6 +87,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
 
         self.increase_preys = 0
         self.increase_predators = 0
+        self.large_map = np.zeros((self.w*3, self.h*3), dtype=np.int32)
 
 
 
@@ -139,6 +140,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
             y = empty_cells_ind[1][perm[i]]
             self.map[x][y] = self.max_id
             agent.pos = (x, y)
+            self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = self.max_id
             self.max_id += 1
 
             if agent.predator:
@@ -192,9 +194,11 @@ class SimplePopulationDynamicsGA(BaseEnv):
                                     buffer.append((coord[0]+x, coord[1]+y))
                                     connected_wall.append((coord[0]+x, coord[1]+y))
                                     self.map[coord[0]+x][coord[1]+y] = -1
+                                    self.large_map[(coord[0]+x):self.large_map.shape[0]:self.map.shape[0], (coord[1]+y):self.large_map.shape[1]:self.map.shape[1]] = -1
                     if len(connected_wall) > 1:
                         for (x, y) in connected_wall:
                             self.map[x][y] = -1
+                            self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = -1
 
     def _init_property(self):
         self.property[-3] = [1, [1, 0, 0]]
@@ -216,17 +220,13 @@ class SimplePopulationDynamicsGA(BaseEnv):
                 self.num_food += 1
 
     def crossover_predator(self, crossover_scope=3, crossover_rate=0.001):
-        large_map = np.zeros((w*3, h*3), dtype=np.int32)
-        for i in range(3):
-            for j in range(3):
-                large_map[w*i:w*(i+1), h*j:h*(j+1)] = self.map
 
         ind = np.where(self.map == 0)
         perm = np.random.permutation(np.arange(len(ind[0])))
         index = 0
         for predator in list(self.predators.values()):
             x, y = predator.pos
-            local_map = large_map[(self.w+x-crossover_scope//2):(self.w+x-crossover_scope//2+crossover_scope), (self.h+y-crossover_scope//2):(self.h+y-crossover_scope//2+crossover_scope)]
+            local_map = self.large_map[(self.w+x-crossover_scope//2):(self.w+x-crossover_scope//2+crossover_scope), (self.h+y-crossover_scope//2):(self.h+y-crossover_scope//2+crossover_scope)]
             agent_indices = np.where(local_map > 0)
 
             if len(agent_indices[0]) == 0 or predator.crossover:
@@ -235,7 +235,8 @@ class SimplePopulationDynamicsGA(BaseEnv):
             for candidate_x, candidate_y in zip(agent_indices[0], agent_indices[1]):
                 candidate_id = local_map[candidate_x, candidate_y]
                 candidate_agent = self.agents[candidate_id]
-                if candidate_agent.predator and not candidate_agent.crossover and predator.id != candidate_agent.id:
+                predator.checked.append(candidate_agent.id)
+                if candidate_agent.predator and not candidate_agent.crossover and predator.id != candidate_agent.id and predator.id not in candidate_agent.checked:
                     candidate_agent.get_closer = True
                     if np.random.rand() < crossover_rate:
                         #for i in range(np.random.randint(self.args.max_predator_offsprings)):
@@ -248,13 +249,14 @@ class SimplePopulationDynamicsGA(BaseEnv):
                         self.agent_embeddings[child.id] = new_embedding
                         child.spped = None
                         child.predator = True
-                        child.health = 2
+                        child.health = 1
                         child.hunt_square = self.max_hunt_square
                         child.property = [self._gen_power(child.id), [0, 0, 1]]
                         x = ind[0][perm[index]]
                         y = ind[1][perm[index]]
                         index += 1
                         self.map[x][y] = child.id
+                        self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = child.id
                         child.pos = (x, y)
                         self.predators[child.id] = child
                         self.predator_num += 1
@@ -265,16 +267,13 @@ class SimplePopulationDynamicsGA(BaseEnv):
 
     def crossover_prey(self, crossover_scope=3, crossover_rate=0.001):
         large_map = np.zeros((w*3, h*3), dtype=np.int32)
-        for i in range(3):
-            for j in range(3):
-                large_map[w*i:w*(i+1), h*j:h*(j+1)] = self.map
 
         ind = np.where(self.map == 0)
         perm = np.random.permutation(np.arange(len(ind[0])))
         index = 0
         for prey in list(self.preys.values()):
             x, y = prey.pos
-            local_map = large_map[(self.w+x-crossover_scope//2):(self.w+x-crossover_scope//2+crossover_scope), (self.h+y-crossover_scope//2):(self.h+y-crossover_scope//2+crossover_scope)]
+            local_map = self.large_map[(self.w+x-crossover_scope//2):(self.w+x-crossover_scope//2+crossover_scope), (self.h+y-crossover_scope//2):(self.h+y-crossover_scope//2+crossover_scope)]
             agent_indices = np.where(local_map > 0)
 
             if len(agent_indices[0]) == 0 or prey.crossover:
@@ -283,8 +282,9 @@ class SimplePopulationDynamicsGA(BaseEnv):
             for candidate_x, candidate_y in zip(agent_indices[0], agent_indices[1]):
                 candidate_id = local_map[candidate_x, candidate_y]
                 candidate_agent = self.agents[candidate_id]
+                prey.checked.append(candidate_agent.id)
 
-                if not candidate_agent.predator and not candidate_agent.crossover and candidate_agent.id != prey.id:
+                if not candidate_agent.predator and not candidate_agent.crossover and candidate_agent.id != prey.id and prey.id not in candidate_agent.checked:
                     candidate_agent.get_closer = True
                     if np.random.rand() < crossover_rate:
                         candidate_agent.crossover = True
@@ -303,6 +303,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
                         y = ind[1][perm[index]]
                         index += 1
                         self.map[x][y] = child.id
+                        self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = child.id
                         child.pos = (x, y)
                         self.preys[child.id] = child
                         self.prey_num += 1
@@ -319,6 +320,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
             if (agent.health <= 0):
                 x, y = agent.pos
                 self.map[x][y] = 0
+                self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = 0
                 if agent.predator:
                     del self.predators[agent.id]
                     self.predator_num -= 1
@@ -333,6 +335,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
                 self.prey_num -= 1
                 x, y = agent.pos
                 self.map[x][y] = 0
+                self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = 0
             #elif not agent.predator and np.random.rand() < death_prob: # Change this later
             #    killed.append(agent.id)
             #    del self.preys[agent.id]
@@ -342,6 +345,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
             else:
                 agent.age += 1
                 agent.crossover=False
+                agent.checked = []
         self.killed = []
         self.increase_predators = 0
         self.increase_preys = 0
@@ -358,19 +362,6 @@ class SimplePopulationDynamicsGA(BaseEnv):
 
         return get_obs(self, only_view=True)
 
-    def step(self, actions):
-        self.timestep += 1
-        self.take_actions(actions)
-        rewards = {}
-
-        obs, rewards, killed = zip(*self.render())
-        self.killed = list(dict(killed).values())
-
-
-        for id, killed in killed:
-            if killed is not None:
-                self.increase_health(self.agents[id])
-        return obs, dict(rewards)
 
 def get_obs(env, only_view=False):
     global agent_emb_dim

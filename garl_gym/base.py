@@ -112,6 +112,8 @@ class BaseEnv(object):
 
         new_x, new_y = agent.pos
         self.map[x][y] = 0
+        self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = 0
+        self.large_map[new_x:self.large_map.shape[0]:self.map.shape[0], new_y:self.large_map.shape[1]:self.map.shape[1]] = agent.id
         self.map[new_x][new_y] = agent.id
 
     def decrease_health(self, agent):
