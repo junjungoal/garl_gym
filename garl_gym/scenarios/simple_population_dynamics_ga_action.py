@@ -556,23 +556,21 @@ def _get_reward(agent):
             reward += 1
 
         if agent.crossover:
-            reward += 2
+            reward += 1.5
 
         if agent.fail_crossover:
             reward -= 1
 
         if agent.health <= 0:
-            reward -= 1
+            reward -= 2
     else:
-        if agent.id in _killed.values():
-            reward -= 1
+        if agent.id in _killed.values() or agent.health <= 0:
+            reward -= 2
 
         if agent.fail_crossover:
             reward -= 1
         if agent.crossover:
-            reward += 2
-        if agent.health<= 0:
-            reward -= 1
+            reward += 1.5
         #else:
         #    reward += 0.2
 
