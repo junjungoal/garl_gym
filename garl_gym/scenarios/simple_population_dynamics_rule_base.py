@@ -84,7 +84,7 @@ class SimplePopulationDynamicsRuleBase(BaseEnv):
         self.agent_emb_dim = args.agent_emb_dim
 
         self.cpu_cores = args.cpu_cores
-
+        self.large_map = np.zeros((self.w*3, self.h*3), dtype=np.int32)
 
     #@property
     #def predators(self):
@@ -97,53 +97,6 @@ class SimplePopulationDynamicsRuleBase(BaseEnv):
     @property
     def agents(self):
         return {**self.predators, **self.preys}
-
-
-
-    def make_world(self, wall_prob=0, wall_seed=10, food_prob=0.1, food_seed=10):
-        self.gen_wall(wall_prob, wall_seed)
-        self.gen_food(food_prob, food_seed)
-
-        predators = {}
-        preys = {}
-
-        agents = [Agent() for _ in range(self.predator_num + self.prey_num)]
-
-        empty_cells_ind = np.where(self.map == 0)
-        perm = np.random.permutation(range(len(empty_cells_ind[0])))
-
-        for i, agent in enumerate(agents):
-            agent.name = 'agent {:d}'.format(i+1)
-            health = np.random.uniform(self.min_health, self.max_health)
-            agent.health = health
-            agent.original_health = health
-            agent.birth_time = self.timestep
-            if i < self.predator_num:
-                agent.predator = True
-                agent.id = self.max_id
-                agent.speed = 1
-                agent.hunt_square = self.max_hunt_square
-                agent.property = [self._gen_power(i+1), [0, 0, 1]]
-            else:
-                agent.predator = False
-                agent.id = i+1
-                agent.property = [self._gen_power(i+1), [1, 0, 0]]
-            new_embedding = np.random.normal(size=[self.agent_emb_dim])
-            self.agent_embeddings[agent.id] = new_embedding
-
-            x = empty_cells_ind[0][perm[i]]
-            y = empty_cells_ind[1][perm[i]]
-            self.map[x][y] = self.max_id
-            agent.pos = (x, y)
-            self.max_id += 1
-
-            if agent.predator:
-                predators[agent.id] = agent
-            else:
-                preys[agent.id] = agent
-
-            self.predators = predators
-            self.preys = preys
 
     def gen_food(self, prob=0.1, seed=10):
         for i in range(self.h):

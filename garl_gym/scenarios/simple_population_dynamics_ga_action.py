@@ -242,7 +242,7 @@ class SimplePopulationDynamicsGAAction(BaseEnv):
             else:
                 self._take_action(agent, actions[id], i)
                 #agent.health += 0.005
-                agent.health += 0.001
+                agent.health += 0.0002
 
     def _take_action(self, agent, action, i):
         def in_board(x, y):
@@ -310,14 +310,21 @@ class SimplePopulationDynamicsGAAction(BaseEnv):
 
         coord = None
         min_dist = np.inf
+        if agent.predator:
+            crossover_rate = self.args.predator_increase_prob
+        else:
+            crossover_rate = self.args.prey_increase_prob
+
         for candidate_x, candidate_y in zip(agent_indices[0], agent_indices[1]):
             candidate_id = local_map[candidate_x, candidate_y]
             candidate_agent = self.agents[candidate_id]
-            if candidate_agent.predator == agent.predator and candidate_agent.id != agent.id and not candidate_agent.crossover:
-                dist = (x-candidate_x)**2 + (y-candidate_y)**2
-                if dist < min_dist:
-                    min_dist = dist
-                    coord = (candidate_x, candidate_y)
+            agent.checked.append(candidate_id)
+            if candidate_agent.predator == agent.predator and candidate_agent.id != agent.id and not candidate_agent.crossover and agent.id not in candidate_agent.checked:
+                if np.random.rand() < crossover_rate:
+                    dist = (x-candidate_x)**2 + (y-candidate_y)**2
+                    if dist < min_dist:
+                        min_dist = dist
+                        coord = (candidate_x, candidate_y)
         if coord is None:
             agent.fail_crossover = True
             return
@@ -349,15 +356,16 @@ class SimplePopulationDynamicsGAAction(BaseEnv):
             self.preys[child.id] = child
             self.increase_preys += 1
         ### decrease health?
-        candidate_agent.health -= 0.5
-        agent.health -= 0.5
+        candidate_agent.health -= 0.4
+        agent.health -= 0.4
+
 
     def remove_dead_agents(self):
         killed = []
         for agent in self.agents.values():
             #if agent.health <= 0 or np.random.rand() < 0.05:
             #if agent.health <= 0:
-            death_prob = norm.cdf(agent.age, loc=400, scale=150)
+            #death_prob = norm.cdf(agent.age, loc=1000, scale=150)
             if (agent.health <= 0):
                 x, y = agent.pos
                 self.map[x][y] = 0
@@ -377,15 +385,21 @@ class SimplePopulationDynamicsGAAction(BaseEnv):
                 x, y = agent.pos
                 self.map[x][y] = 0
                 self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = 0
-            #elif not agent.predator and np.random.rand() < death_prob: # Change this later
-            #    killed.append(agent.id)
-            #    del self.preys[agent.id]
-            #    self.prey_num -= 1
+            #elif np.random.rand() < death_prob: # Change this later
+            #    if agent.predator:
+            #        del self.predators[agent.id]
+            #        self.predator_num -= 1
+            #    else:
+            #        del self.preys[agent.id]
+            #        self.prey_num -= 1
             #    x, y = agent.pos
             #    self.map[x][y] = 0
+            #    self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = 0
+            #    killed.append(agent.id)
             else:
                 agent.age += 1
                 agent.crossover=False
+                agent.checked = []
         self.killed = []
         self.increase_predators = 0
         self.increase_preys = 0
@@ -543,23 +557,21 @@ def _get_reward(agent):
             reward += 1
 
         if agent.crossover:
-            reward += 2
+            reward += 1.5
 
         if agent.fail_crossover:
             reward -= 1
 
         if agent.health <= 0:
-            reward -= 1
+            reward -= 2
     else:
-        if agent.id in _killed.values():
-            reward -= 1
+        if agent.id in _killed.values() or agent.health <= 0:
+            reward -= 2
 
         if agent.fail_crossover:
             reward -= 1
         if agent.crossover:
-            reward += 2
-        if agent.health<= 0:
-            reward -= 1
+            reward += 1.5
         #else:
         #    reward += 0.2
 
