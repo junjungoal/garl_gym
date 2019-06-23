@@ -466,6 +466,8 @@ def _get_obs(agent):
 
     if obs_type == 'dense':
         return (agent.id, obs[:4].reshape(-1))
+    elif obs_type == 'conv_with_id':
+        return (agent.id, obs[:4])
     else:
         return (agent.id, obs)
 
