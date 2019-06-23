@@ -242,7 +242,7 @@ class SimplePopulationDynamicsGAAction(BaseEnv):
             else:
                 self._take_action(agent, actions[id], i)
                 #agent.health += 0.005
-                agent.health += 0.0004
+                agent.health += 0.0002
 
     def _take_action(self, agent, action, i):
         def in_board(x, y):
@@ -358,6 +358,7 @@ class SimplePopulationDynamicsGAAction(BaseEnv):
         ### decrease health?
         candidate_agent.health -= 0.4
         agent.health -= 0.4
+
 
     def remove_dead_agents(self):
         killed = []
