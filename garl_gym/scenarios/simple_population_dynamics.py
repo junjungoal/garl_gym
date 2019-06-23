@@ -103,50 +103,6 @@ class SimplePopulationDynamics(BaseEnv):
 
 
 
-    def make_world(self, wall_prob=0, wall_seed=10, food_prob=0.1, food_seed=10):
-        self.gen_wall(wall_prob, wall_seed)
-        self.gen_food(food_prob, food_seed)
-
-        predators = {}
-        preys = {}
-
-        agents = [Agent() for _ in range(self.predator_num + self.prey_num)]
-
-        empty_cells_ind = np.where(self.map == 0)
-        perm = np.random.permutation(range(len(empty_cells_ind[0])))
-
-        for i, agent in enumerate(agents):
-            agent.name = 'agent {:d}'.format(i+1)
-            health = np.random.uniform(self.min_health, self.max_health)
-            agent.health = health
-            agent.original_health = health
-            agent.birth_time = self.timestep
-            if i < self.predator_num:
-                agent.predator = True
-                agent.id = self.max_id
-                agent.speed = 1
-                agent.hunt_square = self.max_hunt_square
-                agent.property = [self._gen_power(i+1), [0, 0, 1]]
-            else:
-                agent.predator = False
-                agent.id = i+1
-                agent.property = [self._gen_power(i+1), [1, 0, 0]]
-            new_embedding = np.random.normal(size=[self.agent_emb_dim])
-            self.agent_embeddings[agent.id] = new_embedding
-
-            x = empty_cells_ind[0][perm[i]]
-            y = empty_cells_ind[1][perm[i]]
-            self.map[x][y] = self.max_id
-            agent.pos = (x, y)
-            self.max_id += 1
-
-            if agent.predator:
-                predators[agent.id] = agent
-            else:
-                preys[agent.id] = agent
-
-            self.predators = predators
-            self.preys = preys
 
     def gen_food(self, prob=0.1, seed=10):
         for i in range(self.h):
@@ -155,39 +111,6 @@ class SimplePopulationDynamics(BaseEnv):
                 if food_prob < prob and self.map[i][j] != -1 and self.food_map[i][j] == 0:
                     self.food_map[i][j] = -2
                     self.num_food += 1
-
-
-
-    def gen_wall(self, prob=0, seed=10):
-        if prob == 0:
-            return
-        np.random.seed(seed)
-
-        for i in range(self.h):
-            for j in range(self.w):
-                #if i == 0 or i == self.h-1 or j == 0 or j == self.w - 1:
-                #    self.map[i][j] = -1
-                #    continue
-                wall_prob = np.random.rand()
-                buffer = []
-                connected_wall = []
-                if wall_prob < prob:
-                    #self.map[i][j] = -1
-                    buffer.append((i, j))
-                    connected_wall.append((i, j))
-
-                    while len(buffer) != 0:
-                        coord = buffer.pop()
-                        for x, y in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
-                                if np.random.rand() < 0.15 and coord[0]+x>=0 and coord[0]+x<=self.h-1 and coord[1]+y>=0 and coord[1]+y<=self.w-1:
-                                    buffer.append((coord[0]+x, coord[1]+y))
-                                    connected_wall.append((coord[0]+x, coord[1]+y))
-                                    self.map[coord[0]+x][coord[1]+y] = -1
-                    if len(connected_wall) > 1:
-                        for (x, y) in connected_wall:
-                            self.map[x][y] = -1
-
-
 
     def _init_property(self):
         self.property[-3] = [1, [1, 0, 0]]

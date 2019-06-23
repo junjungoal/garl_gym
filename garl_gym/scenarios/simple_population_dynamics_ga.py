@@ -261,8 +261,8 @@ class SimplePopulationDynamicsGA(BaseEnv):
                         self.predators[child.id] = child
                         self.predator_num += 1
                         ### decrease health?
-                        candidate_agent.health -= 0.2
-                        predator.health -= 0.2
+                        candidate_agent.health -= 0.3
+                        predator.health -= 0.3
                         self.increase_predators += 1
 
     def crossover_prey(self, crossover_scope=3, crossover_rate=0.001):
@@ -307,8 +307,9 @@ class SimplePopulationDynamicsGA(BaseEnv):
                         child.pos = (x, y)
                         self.preys[child.id] = child
                         self.prey_num += 1
-                        candidate_agent.health -= 0.2
-                        prey.health -= 0.2
+
+                        candidate_agent.health -= 0.3
+                        prey.health -= 0.3
                         self.increase_preys += 1
 
     def remove_dead_agents(self):
@@ -509,12 +510,13 @@ def _get_reward(agent):
             reward += 1.5
 
         if agent.health <= 0:
-            reward -= 1
+            reward -= 2
     else:
-        if agent.id in _killed.values():
-            reward -= 1
+        if agent.id in _killed.values() or agent.health  <= 0:
+            reward -= 2
+
         if agent.crossover:
-            reward += 0.5
+            reward += 1.5
         #else:
         #    reward += 0.2
 
