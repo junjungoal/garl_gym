@@ -191,67 +191,108 @@ class SimplePopulationDynamicsRuleBase(BaseEnv):
                 self.food_map[x][y] = -2
                 self.num_food += 1
 
-    def increase_predator(self, prob):
-        num = max(1, int(len(self.predators) * prob))
+
+    def crossover_predator(self, crossover_scope=3, crossover_rate=0.001):
+
         ind = np.where(self.map == 0)
         perm = np.random.permutation(np.arange(len(ind[0])))
+        index = 0
+        for predator in list(self.predators.values()):
+            x, y = predator.pos
+            local_map = self.large_map[(self.w+x-crossover_scope//2):(self.w+x-crossover_scope//2+crossover_scope), (self.h+y-crossover_scope//2):(self.h+y-crossover_scope//2+crossover_scope)]
+            agent_indices = np.where(local_map > 0)
 
-        for i in range(num):
-            agent = Agent()
-            agent.health = 1
-            agent.original_health = 1
-            agent.birth_time = self.timestep
-            agent.predator = True
+            if len(agent_indices[0]) == 0 or predator.crossover:
+                continue
 
-            agent.id = self.max_id
-            self.max_id += 1
-            agent.speed = 1
-            agent.hunt_square = self.max_hunt_square
-            agent.property = [self._gen_power(agent.id), [0, 0, 1]]
-            x = ind[0][perm[i]]
-            y = ind[1][perm[i]]
-            if self.map[x][y] == 0:
-                self.map[x][y] = agent.id
-                agent.pos = (x, y)
-            self.predators[agent.id] = agent
-            new_embedding = np.random.normal(size=[self.agent_emb_dim])
-            self.agent_embeddings[agent.id] = new_embedding
+            for candidate_x, candidate_y in zip(agent_indices[0], agent_indices[1]):
+                candidate_id = local_map[candidate_x, candidate_y]
+                candidate_agent = self.agents[candidate_id]
+                predator.checked.append(candidate_agent.id)
+                if candidate_agent.predator and not candidate_agent.crossover and predator.id != candidate_agent.id and predator.id not in candidate_agent.checked:
+                    candidate_agent.get_closer = True
+                    if np.random.rand() < crossover_rate:
+                        #for i in range(np.random.randint(self.args.max_predator_offsprings)):
+                        candidate_agent.crossover = True
+                        predator.crossover = True
+                        child = Agent()
+                        child.id = self.max_id
+                        self.max_id += 1
+                        new_embedding = np.random.normal(size=[self.agent_emb_dim])
+                        self.agent_embeddings[child.id] = new_embedding
+                        child.spped = None
+                        child.predator = True
+                        child.health = 1
+                        child.hunt_square = self.max_hunt_square
+                        child.property = [self._gen_power(child.id), [0, 0, 1]]
+                        x = ind[0][perm[index]]
+                        y = ind[1][perm[index]]
+                        index += 1
+                        self.map[x][y] = child.id
+                        self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = child.id
+                        child.pos = (x, y)
+                        self.predators[child.id] = child
+                        self.predator_num += 1
+                        ### decrease health?
+                        candidate_agent.health -= 0.3
+                        predator.health -= 0.3
+                        self.increase_predators += 1
 
-    def increase_prey(self, prob):
-        num = max(1, int(len(self.preys) * prob))
+    def crossover_prey(self, crossover_scope=3, crossover_rate=0.001):
         ind = np.where(self.map == 0)
         perm = np.random.permutation(np.arange(len(ind[0])))
-        for i in range(num):
-            agent = Agent()
-            agent.health = 1
-            agent.original_health = 1
-            agent.birth_time = self.timestep
-            agent.predator = False
+        index = 0
+        for prey in list(self.preys.values()):
+            x, y = prey.pos
+            local_map = self.large_map[(self.w+x-crossover_scope//2):(self.w+x-crossover_scope//2+crossover_scope), (self.h+y-crossover_scope//2):(self.h+y-crossover_scope//2+crossover_scope)]
+            agent_indices = np.where(local_map > 0)
 
-            agent.id = self.max_id
-            self.max_id += 1
-            agent.property = [self._gen_power(agent.id), [1, 0, 0]]
-            x = ind[0][perm[i]]
-            y = ind[1][perm[i]]
-            if self.map[x][y] == 0:
-                self.map[x][y] = agent.id
-                agent.pos = (x, y)
-            self.preys[agent.id] = agent
-            new_embedding = np.random.normal(size=[self.agent_emb_dim])
-            self.agent_embeddings[agent.id] = new_embedding
 
+            if len(agent_indices[0]) == 0 or prey.crossover:
+                continue
+
+            for candidate_x, candidate_y in zip(agent_indices[0], agent_indices[1]):
+                candidate_id = local_map[candidate_x, candidate_y]
+                candidate_agent = self.agents[candidate_id]
+                prey.checked.append(candidate_agent.id)
+
+                if not candidate_agent.predator and not candidate_agent.crossover and candidate_agent.id != prey.id and prey.id not in candidate_agent.checked:
+                    candidate_agent.get_closer = True
+                    if np.random.rand() < crossover_rate:
+                        candidate_agent.crossover = True
+                        prey.crossover = True
+                        child = Agent()
+                        child.id = self.max_id
+                        self.max_id += 1
+                        child.speed = None
+                        child.predator = False
+                        child.health = 1
+                        new_embedding = np.random.normal(size=[self.agent_emb_dim])
+                        self.agent_embeddings[child.id] = new_embedding
+                        child.hunt_square = self.max_hunt_square
+                        child.property = [self._gen_power(child.id), [1, 0, 0]]
+                        x = ind[0][perm[index]]
+                        y = ind[1][perm[index]]
+                        index += 1
+                        self.map[x][y] = child.id
+                        self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = child.id
+                        child.pos = (x, y)
+                        self.preys[child.id] = child
+                        self.prey_num += 1
+
+                        candidate_agent.health -= 0.3
+                        prey.health -= 0.3
+                        self.increase_preys += 1
 
 
     def take_actions(self):
-        large_map = np.zeros((self.w*3, self.h*3))
-        for i in range(3):
-            for j in range(3):
-                large_map[self.w*i:self.w*(i+1), self.h*j:self.h*(j+1)] = self.map
         for id, agent in self.agents.items():
             x, y = agent.pos
-            local_map = large_map[(self.w+x-self.vision_width//2):(self.w+x-self.vision_width//2+self.vision_width), (self.h+y-self.vision_height//2):(self.h+y-self.vision_height//2+self.vision_height)]
+            local_map = self.large_map[(self.w+x-self.vision_width//2):(self.w+x-self.vision_width//2+self.vision_width), (self.h+y-self.vision_height//2):(self.h+y-self.vision_height//2+self.vision_height)]
 
             agent_indices = np.where(local_map>0)
+            if len(agent_indices[0]) == 0:
+                self._take_action(agent, np.random.randint(4))
 
             coord_opponent = []
             coord_ally = []
@@ -267,7 +308,7 @@ class SimplePopulationDynamicsRuleBase(BaseEnv):
                     coord_opponent.append((candidate_x, candidate_y))
 
             dist_values = []
-            for diff_x, diff_y in [(-1, 0), (1, 0), (0, -1), (0, 1), (0, 0)]: # 5 Actions in total
+            for diff_x, diff_y in [(-1, 0), (1, 0), (0, -1), (0, 1)]: # 5 Actions in total
                 new_x = self.vision_width//2. + diff_x
                 new_y = self.vision_height//2. + diff_y
                 new_dist_oppo = 0
@@ -284,61 +325,6 @@ class SimplePopulationDynamicsRuleBase(BaseEnv):
             self._take_action(agent, action)
             if agent.predator:
                 self.decrease_health(agent)
-
-
-    def _take_action(self, agent, action):
-        def in_board(x, y):
-            return not (x < 0 or x >= self.h or y < 0 or y >= self.w) and self.map[x][y] == 0
-        x, y = agent.pos
-        if action == 0:
-            new_x = x - 1
-            new_y = y
-            if in_board(new_x, new_y):
-                agent.pos = (new_x, new_y)
-            elif new_x < 0:
-                new_x = self.h-1
-                new_y = y
-                if in_board(new_x, new_y):
-                    agent.pos = (new_x, new_y)
-        elif action == 1:
-            new_x = x + 1
-            new_y = y
-            if in_board(new_x, new_y):
-                agent.pos = (new_x, new_y)
-            elif new_x >= self.h:
-                new_x = 0
-                new_y = y
-                if in_board(new_x, new_y):
-                    agent.pos = (new_x, new_y)
-        elif action == 2:
-            new_x = x
-            new_y = y - 1
-            if in_board(new_x, new_y):
-                agent.pos = (new_x, new_y)
-            elif new_y < 0:
-                new_x = x
-                new_y = self.w-1
-                if in_board(new_x, new_y):
-                    agent.pos = (new_x, new_y)
-        elif action == 3:
-            new_x = x
-            new_y = y + 1
-            if in_board(new_x, new_y):
-                agent.pos = (new_x, new_y)
-            elif new_y >= self.w:
-                new_y = 0
-                new_x = x
-                if in_board(new_x, new_y):
-                    agent.pos = (new_x, new_y)
-        elif action == 4:
-            next
-        else:
-            print('Wrong action id')
-
-        new_x, new_y = agent.pos
-        self.map[x][y] = 0
-        self.map[new_x][new_y] = agent.id
-
 
 
     def decrease_health(self, agent):
@@ -400,7 +386,11 @@ class SimplePopulationDynamicsRuleBase(BaseEnv):
         for agent in self.agents.values():
             #if agent.health <= 0 or np.random.rand() < 0.05:
             #if agent.health <= 0:
+         #   death_prob = norm.cdf(agent.age, loc=400, scale=150)
             if (agent.health <= 0):
+                x, y = agent.pos
+                self.map[x][y] = 0
+                self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = 0
                 if agent.predator:
                     del self.predators[agent.id]
                     self.predator_num -= 1
@@ -408,8 +398,6 @@ class SimplePopulationDynamicsRuleBase(BaseEnv):
                     del self.preys[agent.id]
                     self.prey_num -= 1
                 killed.append(agent.id)
-                x, y = agent.pos
-                self.map[x][y] = 0
             elif agent.id in self.killed:
                 # change this later
                 killed.append(agent.id)
@@ -417,11 +405,22 @@ class SimplePopulationDynamicsRuleBase(BaseEnv):
                 self.prey_num -= 1
                 x, y = agent.pos
                 self.map[x][y] = 0
+                self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = 0
+            #elif not agent.predator and np.random.rand() < death_prob: # Change this later
+            #    killed.append(agent.id)
+            #    del self.preys[agent.id]
+            #    self.prey_num -= 1
+            #    x, y = agent.pos
+            #    self.map[x][y] = 0
             else:
                 agent.age += 1
                 agent.crossover=False
+                agent.checked = []
         self.killed = []
+        self.increase_predators = 0
+        self.increase_preys = 0
         return killed
+
 
     def reset(self):
         self.__init__(self.args)

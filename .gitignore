@@ -168,3 +168,4 @@ Additional ignored files
 /.project
 /.pydevproject
 /doc/_build
+tmp

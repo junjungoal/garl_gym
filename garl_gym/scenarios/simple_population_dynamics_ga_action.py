@@ -242,7 +242,7 @@ class SimplePopulationDynamicsGAAction(BaseEnv):
             else:
                 self._take_action(agent, actions[id], i)
                 #agent.health += 0.005
-                agent.health += 0.0002
+                agent.health += 0.001
 
     def _take_action(self, agent, action, i):
         def in_board(x, y):
@@ -306,10 +306,11 @@ class SimplePopulationDynamicsGAAction(BaseEnv):
 
         if len(agent_indices[0]) == 0 or agent.crossover:
             agent.fail_crossover = True
+            #agent.health -= 0.2
             return
 
-        coord = None
         min_dist = np.inf
+        coord = None
         if agent.predator:
             crossover_rate = self.args.predator_increase_prob
         else:
@@ -327,9 +328,11 @@ class SimplePopulationDynamicsGAAction(BaseEnv):
                         coord = (candidate_x, candidate_y)
         if coord is None:
             agent.fail_crossover = True
+            #agent.health -= 0.2
             return
 
         #for i in range(np.random.randint(self.args.max_predator_offsprings)):
+        candidate_agent = self.agents[local_map[coord[0], coord[1]]]
         candidate_agent.crossover = True
         agent.crossover = True
         child = Agent()
@@ -400,6 +403,7 @@ class SimplePopulationDynamicsGAAction(BaseEnv):
                 agent.age += 1
                 agent.crossover=False
                 agent.checked = []
+                agent.fail_crossover = False
         self.killed = []
         self.increase_predators = 0
         self.increase_preys = 0

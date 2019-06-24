@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
 from cv2 import VideoWriter, imread, resize
+from garl_gym.core import Agent
 import cv2
 
 class BaseEnv(object):

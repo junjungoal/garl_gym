@@ -266,8 +266,6 @@ class SimplePopulationDynamicsGA(BaseEnv):
                         self.increase_predators += 1
 
     def crossover_prey(self, crossover_scope=3, crossover_rate=0.001):
-        large_map = np.zeros((w*3, h*3), dtype=np.int32)
-
         ind = np.where(self.map == 0)
         perm = np.random.permutation(np.arange(len(ind[0])))
         index = 0
