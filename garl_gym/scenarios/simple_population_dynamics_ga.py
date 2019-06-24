@@ -124,6 +124,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
             agent.original_health = health
             agent.birth_time = self.timestep
             agent.life = np.random.normal(500, scale=100)
+            agent.age = np.random.randint(150)
             if i < self.predator_num:
                 agent.predator = True
                 agent.id = self.max_id
@@ -238,7 +239,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
                 candidate_id = local_map[candidate_x, candidate_y]
                 candidate_agent = self.agents[candidate_id]
                 predator.checked.append(candidate_agent.id)
-                if candidate_agent.predator and not candidate_agent.crossover and predator.id != candidate_agent.id and predator.id not in candidate_agent.checked:
+                if candidate_agent.predator and not candidate_agent.crossover and predator.id != candidate_agent.id and predator.id not in candidate_agent.checked and predator.age > self.args.min_crossover_age:
                     candidate_agent.get_closer = True
                     if np.random.rand() < crossover_rate and flag:
                         #for i in range(np.random.randint(self.args.max_predator_offsprings)):
@@ -287,7 +288,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
                 candidate_agent = self.agents[candidate_id]
                 prey.checked.append(candidate_agent.id)
 
-                if not candidate_agent.predator and not candidate_agent.crossover and candidate_agent.id != prey.id and prey.id not in candidate_agent.checked:
+                if not candidate_agent.predator and not candidate_agent.crossover and candidate_agent.id != prey.id and prey.id not in candidate_agent.checked and prey.age > self.args.min_crossover_age:
                     candidate_agent.get_closer = True
                     if np.random.rand() < crossover_rate and flag:
                         candidate_agent.crossover = True
@@ -303,6 +304,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
                         self.agent_embeddings[child.id] = new_embedding
                         child.hunt_square = self.max_hunt_square
                         child.property = [self._gen_power(child.id), [1, 0, 0]]
+                        new_pos_indices = np.where(local_map == 0)
                         x = ind[0][perm[index]]
                         y = ind[1][perm[index]]
                         index += 1
@@ -507,7 +509,7 @@ def _get_reward(agent):
             reward += 1
 
         if agent.crossover:
-            reward += 1
+            reward += 1.5
 
         if agent.health <= 0:
             reward -= 2
@@ -516,7 +518,7 @@ def _get_reward(agent):
             reward -= 2
 
         if agent.crossover:
-            reward += 1
+            reward += 1.5
         #else:
         #    reward += 0.2
 
