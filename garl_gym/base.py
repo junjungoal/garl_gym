@@ -287,3 +287,54 @@ class BaseEnv(object):
                         for (x, y) in connected_wall:
                             self.map[x][y] = -1
                             self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = -1
+
+
+
+    def add_predators(self, num):
+        self.increase_predators = num
+        ind = np.where(self.map == 0)
+        perm = np.random.permutation(np.arange(len(ind[0])))
+
+        for i in range(num):
+            agent = Agent()
+            agent.health = 1
+            agent.original_health = 1
+            agent.birth_time = self.timestep
+            agent.predator = True
+
+            agent.id = self.max_id
+            self.max_id += 1
+            agent.speed = 1
+            agent.hunt_square = self.max_hunt_square
+            agent.property = [self._gen_power(agent.id), [0, 0, 1]]
+            x = ind[0][perm[i]]
+            y = ind[1][perm[i]]
+            if self.map[x][y] == 0:
+                self.map[x][y] = agent.id
+                agent.pos = (x, y)
+            self.predators[agent.id] = agent
+            new_embedding = np.random.normal(size=[self.agent_emb_dim])
+            self.agent_embeddings[agent.id] = new_embedding
+
+    def add_preys(self, num):
+        self.increase_preys = num
+        ind = np.where(self.map == 0)
+        perm = np.random.permutation(np.arange(len(ind[0])))
+        for i in range(num):
+            agent = Agent()
+            agent.health = 1
+            agent.original_health = 1
+            agent.birth_time = self.timestep
+            agent.predator = False
+
+            agent.id = self.max_id
+            self.max_id += 1
+            agent.property = [self._gen_power(agent.id), [1, 0, 0]]
+            x = ind[0][perm[i]]
+            y = ind[1][perm[i]]
+            if self.map[x][y] == 0:
+                self.map[x][y] = agent.id
+                agent.pos = (x, y)
+            self.preys[agent.id] = agent
+            new_embedding = np.random.normal(size=[self.agent_emb_dim])
+            self.agent_embeddings[agent.id] = new_embedding

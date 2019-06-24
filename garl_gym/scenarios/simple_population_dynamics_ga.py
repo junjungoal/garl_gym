@@ -74,7 +74,6 @@ class SimplePopulationDynamicsGA(BaseEnv):
 
         self.max_hunt_square = args.max_hunt_square
         self.max_speed = args.max_speed
-        self.max_ = args.max_crossover
         self.timestep = 0
         self.num_food = 0
 
