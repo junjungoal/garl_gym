@@ -57,6 +57,7 @@ class Agent(object):
         self.w_moving = None
         self.fail_crossover = False
         self.checked = []
+        self.life = None
 
     def utility(self):
         if self.predator:

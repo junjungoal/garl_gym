@@ -370,8 +370,10 @@ class SimplePopulationDynamicsRuleBase(BaseEnv):
 
                 for ally_x, ally_y in coord_ally:
                     new_dist_ally += (new_x-ally_x)**2 + (new_y-ally_y)**2
-
-                dist_values.append(agent.w_eating*new_dist_oppo-agent.w_mating*new_dist_ally)  # negative of dist for ally
+                if agent.predator:
+                    dist_values.append(-agent.w_eating*new_dist_oppo-agent.w_mating*new_dist_ally)  # negative of dist for ally
+                else:
+                    dist_values.append(agent.w_eating*new_dist_oppo-agent.w_mating*new_dist_ally)  # negative of dist for ally
             action = np.argmax(dist_values)
 
             self._take_action(agent, action)

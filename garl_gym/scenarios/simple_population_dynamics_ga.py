@@ -123,6 +123,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
             agent.health = health
             agent.original_health = health
             agent.birth_time = self.timestep
+            agent.life = np.random.normal(500, scale=100)
             if i < self.predator_num:
                 agent.predator = True
                 agent.id = self.max_id
@@ -225,6 +226,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
         perm = np.random.permutation(np.arange(len(ind[0])))
         index = 0
         for predator in list(self.predators.values()):
+            flag = True
             x, y = predator.pos
             local_map = self.large_map[(self.w+x-crossover_scope//2):(self.w+x-crossover_scope//2+crossover_scope), (self.h+y-crossover_scope//2):(self.h+y-crossover_scope//2+crossover_scope)]
             agent_indices = np.where(local_map > 0)
@@ -238,7 +240,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
                 predator.checked.append(candidate_agent.id)
                 if candidate_agent.predator and not candidate_agent.crossover and predator.id != candidate_agent.id and predator.id not in candidate_agent.checked:
                     candidate_agent.get_closer = True
-                    if np.random.rand() < crossover_rate:
+                    if np.random.rand() < crossover_rate and flag:
                         #for i in range(np.random.randint(self.args.max_predator_offsprings)):
                         candidate_agent.crossover = True
                         predator.crossover = True
@@ -248,6 +250,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
                         new_embedding = np.random.normal(size=[self.agent_emb_dim])
                         self.agent_embeddings[child.id] = new_embedding
                         child.spped = None
+                        child.life = np.random.normal(500, scale=100)
                         child.predator = True
                         child.health = 1
                         child.hunt_square = self.max_hunt_square
@@ -261,11 +264,10 @@ class SimplePopulationDynamicsGA(BaseEnv):
                         self.predators[child.id] = child
                         self.predator_num += 1
                         ### decrease health?
-                        candidate_agent.health -= 0.1
-                        predator.health -= 0.1
+                        #candidate_agent.health -= 0.1
+                        #predator.health -= 0.1
                         self.increase_predators += 1
-
-                        break
+                        flag = False
 
     def crossover_prey(self, crossover_scope=3, crossover_rate=0.001):
         ind = np.where(self.map == 0)
@@ -275,6 +277,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
             x, y = prey.pos
             local_map = self.large_map[(self.w+x-crossover_scope//2):(self.w+x-crossover_scope//2+crossover_scope), (self.h+y-crossover_scope//2):(self.h+y-crossover_scope//2+crossover_scope)]
             agent_indices = np.where(local_map > 0)
+            flag = True
 
             if len(agent_indices[0]) == 0 or prey.crossover:
                 continue
@@ -286,7 +289,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
 
                 if not candidate_agent.predator and not candidate_agent.crossover and candidate_agent.id != prey.id and prey.id not in candidate_agent.checked:
                     candidate_agent.get_closer = True
-                    if np.random.rand() < crossover_rate:
+                    if np.random.rand() < crossover_rate and flag:
                         candidate_agent.crossover = True
                         prey.crossover = True
                         child = Agent()
@@ -294,6 +297,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
                         self.max_id += 1
                         child.speed = None
                         child.predator = False
+                        child.life = np.random.normal(500, scale=100)
                         child.health = 1
                         new_embedding = np.random.normal(size=[self.agent_emb_dim])
                         self.agent_embeddings[child.id] = new_embedding
@@ -308,18 +312,17 @@ class SimplePopulationDynamicsGA(BaseEnv):
                         self.preys[child.id] = child
                         self.prey_num += 1
 
-                        candidate_agent.health -= 0.1
-                        prey.health -= 0.1
+                        #candidate_agent.health -= 0.1
+                        #prey.health -= 0.1
                         self.increase_preys += 1
-                        break
+                        flag = False
 
     def remove_dead_agents(self):
         killed = []
         for agent in self.agents.values():
             #if agent.health <= 0 or np.random.rand() < 0.05:
             #if agent.health <= 0:
-            death_prob = norm.cdf(agent.age, loc=400, scale=150)
-            if (agent.health <= 0):
+            if (agent.health <= 0 or agent.age >= agent.life):
                 x, y = agent.pos
                 self.map[x][y] = 0
                 self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = 0
@@ -338,12 +341,6 @@ class SimplePopulationDynamicsGA(BaseEnv):
                 x, y = agent.pos
                 self.map[x][y] = 0
                 self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = 0
-            #elif not agent.predator and np.random.rand() < death_prob: # Change this later
-            #    killed.append(agent.id)
-            #    del self.preys[agent.id]
-            #    self.prey_num -= 1
-            #    x, y = agent.pos
-            #    self.map[x][y] = 0
             else:
                 agent.age += 1
                 agent.crossover=False
@@ -510,7 +507,7 @@ def _get_reward(agent):
             reward += 1
 
         if agent.crossover:
-            reward += 1.5
+            reward += 1
 
         if agent.health <= 0:
             reward -= 2
@@ -519,7 +516,7 @@ def _get_reward(agent):
             reward -= 2
 
         if agent.crossover:
-            reward += 1.5
+            reward += 1
         #else:
         #    reward += 0.2
 

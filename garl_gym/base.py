@@ -26,6 +26,9 @@ class BaseEnv(object):
             agent.health = health
             agent.original_health = health
             agent.birth_time = self.timestep
+
+            life = np.random.normal(loc=500, scale=100)
+            agent.life = life
             if i < self.predator_num:
                 agent.predator = True
                 agent.id = self.max_id
@@ -105,7 +108,6 @@ class BaseEnv(object):
                 self.decrease_health(agent)
             else:
                 self._take_action(agent, action)
-                agent.health += 0.001
 
     def _take_action(self, agent, action):
         def in_board(x, y):
