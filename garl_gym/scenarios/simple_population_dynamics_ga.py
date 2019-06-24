@@ -261,9 +261,11 @@ class SimplePopulationDynamicsGA(BaseEnv):
                         self.predators[child.id] = child
                         self.predator_num += 1
                         ### decrease health?
-                        candidate_agent.health -= 0.3
-                        predator.health -= 0.3
+                        candidate_agent.health -= 0.1
+                        predator.health -= 0.1
                         self.increase_predators += 1
+
+                        break
 
     def crossover_prey(self, crossover_scope=3, crossover_rate=0.001):
         ind = np.where(self.map == 0)
@@ -306,9 +308,10 @@ class SimplePopulationDynamicsGA(BaseEnv):
                         self.preys[child.id] = child
                         self.prey_num += 1
 
-                        candidate_agent.health -= 0.3
-                        prey.health -= 0.3
+                        candidate_agent.health -= 0.1
+                        prey.health -= 0.1
                         self.increase_preys += 1
+                        break
 
     def remove_dead_agents(self):
         killed = []
