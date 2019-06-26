@@ -85,6 +85,8 @@ class SimplePopulationDynamicsGAUtility(BaseEnv):
         self.cpu_cores = args.cpu_cores
 
         self.large_map = np.zeros((self.w*3, self.h*3), dtype=np.int32)
+        self.increase_predators = 0
+        self.increase_preys = 0
 
 
 
@@ -120,6 +122,9 @@ class SimplePopulationDynamicsGAUtility(BaseEnv):
             agent.health = health
             agent.original_health = health
             agent.birth_time = self.timestep
+            agent.liking = np.random.rand()
+            agent.environmental_condition = np.random.rand()
+            agent.physical = np.random.rand()
             if i < self.predator_num:
                 agent.predator = True
                 agent.id = self.max_id
@@ -204,6 +209,7 @@ class SimplePopulationDynamicsGAUtility(BaseEnv):
             new_embedding = np.random.normal(size=[self.agent_emb_dim])
             self.agent_embeddings[child.id] = new_embedding
             self.predator_num += 1
+        self.increase_predators = n
 
     def crossover_prey(self, crossover_scope=3, crossover_rate=0.001, mutation_rate=0.015):
         preys = list(self.preys.values())
@@ -247,7 +253,7 @@ class SimplePopulationDynamicsGAUtility(BaseEnv):
         #for i in range(self.predator_num):
         #for i in range(len(self.agents)):
             #self.agents[i].health -= self.args.damage_per_step
-        agent.health -= self.args.damage_per_step
+        self.increase_preys = n
 
     def increase_health(self, agent):
         if hasattr(self.args, 'health_increase_rate') and self.args.health_increase_rate is not None:
@@ -261,7 +267,7 @@ class SimplePopulationDynamicsGAUtility(BaseEnv):
         for agent in self.agents.values():
             #if agent.health <= 0 or np.random.rand() < 0.05:
             #if agent.health <= 0:
-            death_prob = norm.cdf(agent.age, loc=400, scale=150)
+            #death_prob = norm.cdf(agent.age, loc=400, scale=150)
             if (agent.health <= 0):
                 x, y = agent.pos
                 self.map[x][y] = 0
@@ -296,90 +302,16 @@ class SimplePopulationDynamicsGAUtility(BaseEnv):
         self.increase_preys = 0
         return killed
 
+    def remove_dead_agent_emb(self, dead_list):
+        for id in dead_list:
+            del self.agent_embeddings[id]
+
     def reset(self):
         self.__init__(self.args)
         self.agent_embeddings = {}
         self.make_world(wall_prob=self.args.wall_prob, wall_seed=self.args.wall_seed, food_prob=self.args.food_prob)
 
         return get_obs(self, only_view=True)
-
-
-def get_obs(env, only_view=False):
-    global agent_emb_dim
-    agent_emb_dim = env.agent_emb_dim
-    global vision_width
-    vision_width = env.vision_width
-    global vision_height
-    vision_height = env.vision_height
-    global agent_embeddings
-    agent_embeddings = env.agent_embeddings
-    global agents
-    agents = env.agents
-
-
-    global cpu_cores
-    cpu_cores = env.cpu_cores
-    global h
-    h = env.h
-    global w
-    w = env.w
-    global _map
-    _map = env.map
-    global _property
-    _property = env.property
-    global obs_type
-    obs_type = env.obs_type
-    global large_map
-    large_map = np.zeros((w*3, h*3), dtype=np.int32)
-    for i in range(3):
-        for j in range(3):
-            large_map[w*i:w*(i+1), h*j:h*(j+1)] = _map
-
-    if env.cpu_cores is None:
-        cores = mp.cpu_count()
-    else:
-        cores = cpu_cores
-
-    if env.args.multiprocessing and len(agents)>7000:
-        pool = mp.Pool(processes=cores)
-        obs = pool.map(_get_obs, agents.values())
-        pool.close()
-        pool.join()
-    else:
-        obs = []
-        for agent in agents.values():
-            obs.append(_get_obs(agent))
-
-    if only_view:
-        return obs
-
-    killed = []
-    for agent in agents.values():
-        killed.append(_get_killed(agent, killed))
-
-    killed = dict(killed)
-
-    global _killed
-    _killed = killed
-
-    if env.args.multiprocessing and len(agents)>7000:
-        pool = mp.Pool(processes=cores)
-        rewards = pool.map(_get_reward, agents.values())
-        pool.close()
-        pool.join()
-    else:
-        rewards = []
-        for agent in agents.values():
-            reward = _get_reward(agent)
-            rewards.append(reward)
-
-    for id, killed_agent in killed.items():
-        if killed_agent is not None:
-            env.increase_health(agents[id])
-    killed = list(killed.values())
-
-    return obs, dict(rewards), killed
-
 
 def get_obs(env, only_view=False):
     global agent_emb_dim
@@ -484,6 +416,8 @@ def _get_obs(agent):
 
     if obs_type == 'dense':
         return (agent.id, obs[:4].reshape(-1))
+    elif obs_type == 'conv_with_id':
+        return (agent.id, obs[:4])
     else:
         return (agent.id, obs)
 
@@ -524,15 +458,16 @@ def _get_reward(agent):
             reward += 1
 
         if agent.crossover:
-            reward += 2
+            reward += 1.5
 
         if agent.health <= 0:
-            reward -= 1
+            reward -= 2
     else:
-        if agent.id in _killed.values():
-            reward -= 1
+        if agent.id in _killed.values() or agent.health  <= 0:
+            reward -= 2
+
         if agent.crossover:
-            reward += 0.5
+            reward += 1.5
         #else:
         #    reward += 0.2
 
