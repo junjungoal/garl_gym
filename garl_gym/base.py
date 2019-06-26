@@ -39,8 +39,6 @@ class BaseEnv(object):
                 agent.predator = False
                 agent.id = i+1
                 agent.property = [self._gen_power(i+1), [1, 0, 0]]
-            new_embedding = np.random.normal(size=[self.agent_emb_dim])
-            self.agent_embeddings[agent.id] = new_embedding
 
             x = empty_cells_ind[0][perm[i]]
             y = empty_cells_ind[1][perm[i]]
@@ -305,6 +303,7 @@ class BaseEnv(object):
             agent.id = self.max_id
             self.max_id += 1
             agent.speed = 1
+            agent.life = np.random.normal(500, 100)
             agent.hunt_square = self.max_hunt_square
             agent.property = [self._gen_power(agent.id), [0, 0, 1]]
             x = ind[0][perm[i]]
@@ -313,8 +312,6 @@ class BaseEnv(object):
                 self.map[x][y] = agent.id
                 agent.pos = (x, y)
             self.predators[agent.id] = agent
-            new_embedding = np.random.normal(size=[self.agent_emb_dim])
-            self.agent_embeddings[agent.id] = new_embedding
 
     def add_preys(self, num):
         self.increase_preys = num
@@ -326,6 +323,7 @@ class BaseEnv(object):
             agent.original_health = 1
             agent.birth_time = self.timestep
             agent.predator = False
+            agent.life = np.random.normal(500, 100)
 
             agent.id = self.max_id
             self.max_id += 1
@@ -336,5 +334,3 @@ class BaseEnv(object):
                 self.map[x][y] = agent.id
                 agent.pos = (x, y)
             self.preys[agent.id] = agent
-            new_embedding = np.random.normal(size=[self.agent_emb_dim])
-            self.agent_embeddings[agent.id] = new_embedding

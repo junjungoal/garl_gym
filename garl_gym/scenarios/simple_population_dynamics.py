@@ -72,7 +72,6 @@ class SimplePopulationDynamics(BaseEnv):
 
         self.max_hunt_square = args.max_hunt_square
         self.max_speed = args.max_speed
-        self.max_crossover = args.max_crossover
         self.timestep = 0
         self.num_food = 0
         self.predator_id = 0
@@ -80,13 +79,13 @@ class SimplePopulationDynamics(BaseEnv):
 
         self.obs_type = args.obs_type
 
-        self.agent_embeddings = {}
         self.agent_emb_dim = args.agent_emb_dim
 
         self.cpu_cores = args.cpu_cores
 
         self.increase_predators = 0
         self.increase_preys = 0
+        self.large_map = np.zeros((self.h*3, self.w*3))
 
 
     #@property
@@ -156,8 +155,6 @@ class SimplePopulationDynamics(BaseEnv):
                 self.map[x][y] = agent.id
                 agent.pos = (x, y)
             self.predators[agent.id] = agent
-            new_embedding = np.random.normal(size=[self.agent_emb_dim])
-            self.agent_embeddings[agent.id] = new_embedding
 
     def increase_prey(self, prob):
         num = max(1, int(len(self.preys) * prob))
@@ -180,8 +177,6 @@ class SimplePopulationDynamics(BaseEnv):
                 self.map[x][y] = agent.id
                 agent.pos = (x, y)
             self.preys[agent.id] = agent
-            new_embedding = np.random.normal(size=[self.agent_emb_dim])
-            self.agent_embeddings[agent.id] = new_embedding
 
 
     def remove_dead_agents(self):
@@ -214,13 +209,9 @@ class SimplePopulationDynamics(BaseEnv):
         self.increase_preys = 0
         return killed
 
-    def remove_dead_agent_emb(self, dead_list):
-        for id in dead_list:
-            del self.agent_embeddings[id]
 
     def reset(self):
         self.__init__(self.args)
-        self.agent_embeddings = {}
         self.make_world(wall_prob=self.args.wall_prob, wall_seed=np.random.randint(5000), food_prob=self.args.food_prob)
 
         return get_obs(self, only_view=True)
@@ -233,8 +224,6 @@ def get_obs(env, only_view=False):
     vision_width = env.vision_width
     global vision_height
     vision_height = env.vision_height
-    global agent_embeddings
-    agent_embeddings = env.agent_embeddings
     global agents
     agents = env.agents
 
@@ -306,9 +295,8 @@ def get_obs(env, only_view=False):
 
 def _get_obs(agent):
     x, y = agent.pos
-    obs = np.zeros((4+agent_emb_dim, vision_width, vision_height))
+    obs = np.zeros((4, vision_width, vision_height))
     obs[:3, :, :] = np.broadcast_to(np.array(_property[0][1]).reshape((3, 1, 1)), (3, vision_width, vision_height))
-    obs[4:, vision_width//2, vision_height//2] = agent_embeddings[agent.id]
     local_map = large_map[(w+x-vision_width//2):(w+x-vision_width//2+vision_width), (h+y-vision_height//2):(h+y-vision_height//2+vision_height)]
     agent_indices = np.where(local_map!=0)
     if len(agent_indices[0]) == 0:
@@ -328,7 +316,7 @@ def _get_obs(agent):
 
 
     if obs_type == 'dense':
-        return (agent.id, obs[:4].reshape(-1))
+        return (agent.id, obs.reshape(-1))
     else:
         return (agent.id, obs)
 

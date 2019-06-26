@@ -241,33 +241,33 @@ class SimplePopulationDynamicsGA(BaseEnv):
                 if candidate_agent.predator and not candidate_agent.crossover and predator.id != candidate_agent.id and predator.id not in candidate_agent.checked and predator.age > self.args.min_crossover_age:
                     candidate_agent.get_closer = True
                     if np.random.rand() < crossover_rate and flag:
-                        #for i in range(np.random.randint(self.args.max_predator_offsprings)):
-                        candidate_agent.crossover = True
-                        predator.crossover = True
-                        child = Agent()
-                        child.id = self.max_id
-                        self.max_id += 1
-                        new_embedding = np.random.normal(size=[self.agent_emb_dim])
-                        self.agent_embeddings[child.id] = new_embedding
-                        child.spped = None
-                        child.life = np.random.normal(500, scale=100)
-                        child.predator = True
-                        child.health = 1
-                        child.hunt_square = self.max_hunt_square
-                        child.property = [self._gen_power(child.id), [0, 0, 1]]
-                        x = ind[0][perm[index]]
-                        y = ind[1][perm[index]]
-                        index += 1
-                        self.map[x][y] = child.id
-                        self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = child.id
-                        child.pos = (x, y)
-                        self.predators[child.id] = child
-                        self.predator_num += 1
-                        ### decrease health?
-                        #candidate_agent.health -= 0.1
-                        #predator.health -= 0.1
-                        self.increase_predators += 1
-                        flag = False
+                        for i in range(np.random.randint(self.args.max_predator_offsprings)+1):
+                            candidate_agent.crossover = True
+                            predator.crossover = True
+                            child = Agent()
+                            child.id = self.max_id
+                            self.max_id += 1
+                            new_embedding = np.random.normal(size=[self.agent_emb_dim])
+                            self.agent_embeddings[child.id] = new_embedding
+                            child.spped = None
+                            child.life = np.random.normal(500, scale=100)
+                            child.predator = True
+                            child.health = 1
+                            child.hunt_square = self.max_hunt_square
+                            child.property = [self._gen_power(child.id), [0, 0, 1]]
+                            x = ind[0][perm[index]]
+                            y = ind[1][perm[index]]
+                            index += 1
+                            self.map[x][y] = child.id
+                            self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = child.id
+                            child.pos = (x, y)
+                            self.predators[child.id] = child
+                            self.predator_num += 1
+                            ### decrease health?
+                            #candidate_agent.health -= 0.1
+                            #predator.health -= 0.1
+                            self.increase_predators += 1
+                            flag = False
 
     def crossover_prey(self, crossover_scope=3, crossover_rate=0.001):
         ind = np.where(self.map == 0)
@@ -290,33 +290,34 @@ class SimplePopulationDynamicsGA(BaseEnv):
                 if not candidate_agent.predator and not candidate_agent.crossover and candidate_agent.id != prey.id and prey.id not in candidate_agent.checked and prey.age > self.args.min_crossover_age:
                     candidate_agent.get_closer = True
                     if np.random.rand() < crossover_rate and flag:
-                        candidate_agent.crossover = True
-                        prey.crossover = True
-                        child = Agent()
-                        child.id = self.max_id
-                        self.max_id += 1
-                        child.speed = None
-                        child.predator = False
-                        child.life = np.random.normal(500, scale=100)
-                        child.health = 1
-                        new_embedding = np.random.normal(size=[self.agent_emb_dim])
-                        self.agent_embeddings[child.id] = new_embedding
-                        child.hunt_square = self.max_hunt_square
-                        child.property = [self._gen_power(child.id), [1, 0, 0]]
-                        new_pos_indices = np.where(local_map == 0)
-                        x = ind[0][perm[index]]
-                        y = ind[1][perm[index]]
-                        index += 1
-                        self.map[x][y] = child.id
-                        self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = child.id
-                        child.pos = (x, y)
-                        self.preys[child.id] = child
-                        self.prey_num += 1
+                        for i in range(np.random.randint(self.args.max_prey_offsprings)+1):
+                            candidate_agent.crossover = True
+                            prey.crossover = True
+                            child = Agent()
+                            child.id = self.max_id
+                            self.max_id += 1
+                            child.speed = None
+                            child.predator = False
+                            child.life = np.random.normal(500, scale=100)
+                            child.health = 1
+                            new_embedding = np.random.normal(size=[self.agent_emb_dim])
+                            self.agent_embeddings[child.id] = new_embedding
+                            child.hunt_square = self.max_hunt_square
+                            child.property = [self._gen_power(child.id), [1, 0, 0]]
+                            new_pos_indices = np.where(local_map == 0)
+                            x = ind[0][perm[index]]
+                            y = ind[1][perm[index]]
+                            index += 1
+                            self.map[x][y] = child.id
+                            self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = child.id
+                            child.pos = (x, y)
+                            self.preys[child.id] = child
+                            self.prey_num += 1
 
-                        #candidate_agent.health -= 0.1
-                        #prey.health -= 0.1
-                        self.increase_preys += 1
-                        flag = False
+                            #candidate_agent.health -= 0.1
+                            #prey.health -= 0.1
+                            self.increase_preys += 1
+                            flag = False
 
     def remove_dead_agents(self):
         killed = []
@@ -399,7 +400,7 @@ def get_obs(env, only_view=False):
     else:
         cores = cpu_cores
 
-    if env.args.multiprocessing and len(agents)>6000:
+    if env.args.multiprocessing and len(agents)>4000:
         pool = mp.Pool(processes=cores)
         obs = pool.map(_get_obs, agents.values())
         pool.close()
@@ -421,7 +422,7 @@ def get_obs(env, only_view=False):
     global _killed
     _killed = killed
 
-    if env.args.multiprocessing and len(agents)>6000:
+    if env.args.multiprocessing and len(agents)>4000:
         pool = mp.Pool(processes=cores)
         rewards = pool.map(_get_reward, agents.values())
         pool.close()
