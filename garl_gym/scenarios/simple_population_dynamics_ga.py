@@ -16,18 +16,18 @@ from scipy.stats import norm
 
 class SimplePopulationDynamicsGA(BaseEnv):
     '''
-    args:
-        - height
-        - width
-        - batch_size
-        - view_args
-        - agent_numbee
-        - num_actions ... not necessary(add flag?)
-        - damage_per_step
-
-    In the future, we define the attack ?
-    If continuous, then size and speed?
-    '''
+-    args:
+-        - height
+-        - width
+-        - batch_size
+-        - view_args
+-        - agent_numbee
+-        - num_actions ... not necessary(add flag?)
+-        - damage_per_step
+-
+-    In the future, we define the attack ?
+-    If continuous, then size and speed?
+-    '''
 
     def __init__(self, args):
         self.args = args
@@ -238,7 +238,8 @@ class SimplePopulationDynamicsGA(BaseEnv):
                 candidate_id = local_map[candidate_x, candidate_y]
                 candidate_agent = self.agents[candidate_id]
                 predator.checked.append(candidate_agent.id)
-                if candidate_agent.predator and not candidate_agent.crossover and predator.id != candidate_agent.id and predator.id not in candidate_agent.checked and predator.age > self.args.min_crossover_age:
+                if (candidate_agent.predator and not candidate_agent.crossover and predator.id != candidate_agent.id and \
+                    predator.id not in candidate_agent.checked and predator.age > self.args.min_crossover_age and len(self.predators) <= self.args.predator_capacity):
                     candidate_agent.get_closer = True
                     if np.random.rand() < crossover_rate and flag:
                         for i in range(np.random.randint(self.args.max_predator_offsprings)+1):
@@ -287,7 +288,8 @@ class SimplePopulationDynamicsGA(BaseEnv):
                 candidate_agent = self.agents[candidate_id]
                 prey.checked.append(candidate_agent.id)
 
-                if not candidate_agent.predator and not candidate_agent.crossover and candidate_agent.id != prey.id and prey.id not in candidate_agent.checked and prey.age > self.args.min_crossover_age:
+                if (not candidate_agent.predator and not candidate_agent.crossover and candidate_agent.id != prey.id and \
+                        prey.id not in candidate_agent.checked and prey.age > self.args.min_crossover_age and len(self.preys) <= self.args.prey_capacity):
                     candidate_agent.get_closer = True
                     if np.random.rand() < crossover_rate and flag:
                         for i in range(np.random.randint(self.args.max_prey_offsprings)+1):
@@ -323,8 +325,8 @@ class SimplePopulationDynamicsGA(BaseEnv):
         killed = []
         for agent in self.agents.values():
             #if agent.health <= 0 or np.random.rand() < 0.05:
-            #if agent.health <= 0:
-            if (agent.health <= 0 or agent.age >= agent.life):
+            if agent.health <= 0:
+            #if (agent.health <= 0 or agent.age >= agent.life):
                 x, y = agent.pos
                 self.map[x][y] = 0
                 self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = 0

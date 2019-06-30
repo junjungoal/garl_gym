@@ -167,6 +167,7 @@ class BaseEnv(object):
         agent.health -= self.args.damage_per_step
 
     def increase_health(self, agent):
+        agent = self.agents[agent.id]
         if hasattr(self.args, 'health_increase_rate') and self.args.health_increase_rate is not None:
             agent.health += self.args.health_increase_rate
         else:
@@ -289,7 +290,7 @@ class BaseEnv(object):
 
 
     def add_predators(self, num):
-        self.increase_predators = num
+        self.increase_predators += num
         ind = np.where(self.map == 0)
         perm = np.random.permutation(np.arange(len(ind[0])))
 
@@ -314,7 +315,7 @@ class BaseEnv(object):
             self.predators[agent.id] = agent
 
     def add_preys(self, num):
-        self.increase_preys = num
+        self.increase_preys += num
         ind = np.where(self.map == 0)
         perm = np.random.permutation(np.arange(len(ind[0])))
         for i in range(num):
@@ -334,3 +335,14 @@ class BaseEnv(object):
                 self.map[x][y] = agent.id
                 agent.pos = (x, y)
             self.preys[agent.id] = agent
+
+    def return_total_reward(self, rewards):
+        total_pred_reward = 0
+        total_prey_reward = 0
+        for id, reward in rewards.items():
+            if self.agents[id].predator:
+                total_pred_reward += reward
+            else:
+                total_prey_reward += reward
+        return total_pred_reward / len(self.predators), total_prey_reward / len(self.preys)
+

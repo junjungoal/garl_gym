@@ -209,7 +209,6 @@ class SimplePopulationDynamics(BaseEnv):
         self.increase_preys = 0
         return killed
 
-
     def reset(self):
         self.__init__(self.args)
         self.make_world(wall_prob=self.args.wall_prob, wall_seed=np.random.randint(5000), food_prob=self.args.food_prob)
