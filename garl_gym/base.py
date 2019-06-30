@@ -29,6 +29,7 @@ class BaseEnv(object):
 
             life = np.random.normal(loc=500, scale=100)
             agent.life = life
+            agent.face = np.random.randint(4)
             if i < self.predator_num:
                 agent.predator = True
                 agent.id = self.max_id
@@ -111,46 +112,128 @@ class BaseEnv(object):
         def in_board(x, y):
             return not (x < 0 or x >= self.h or y < 0 or y >= self.w) and self.map[x][y] == 0
         x, y = agent.pos
+        def move_forward(x, y, face):
+            if face == 0:
+                return x - 1, y
+            elif face == 1:
+                return x, y + 1
+            elif face == 2:
+                return x + 1, y
+            elif face == 3:
+                return x, y - 1
+
+        def move_backward(x, y, face):
+            if face == 0:
+                return x + 1, y
+            elif face == 1:
+                return x, y - 1
+            elif face == 2:
+                return x - 1, y
+            elif face == 3:
+                return x, y + 1
+
+        def move_left(x, y, face):
+            if face == 0:
+                return x, y - 1
+            elif face == 1:
+                return x - 1, y
+            elif face == 2:
+                return x, y + 1
+            elif face == 3:
+                return x + 1, y
+
+        def move_right(x, y, face):
+            if face == 0:
+                return x, y + 1
+            elif face == 1:
+                return x + 1, y
+            elif face == 2:
+                return x, y - 1
+            elif face == 3:
+                return x - 1, y
+
         if action == 0:
-            new_x = x - 1
-            new_y = y
+            new_x, new_y = move_forward(x, y, agent.face)
             if in_board(new_x, new_y):
                 agent.pos = (new_x, new_y)
-            elif new_x < 0:
-                new_x = self.h-1
-                new_y = y
+            else:
+                if agent.face == 0:
+                    new_x = self.h-1
+                    new_y = y
+                elif agent.face == 1:
+                    new_x = x
+                    new_y = 0
+                elif agent.face == 2:
+                    new_x = 0
+                    new_y = y
+                elif agent.face == 3:
+                    new_x = x
+                    new_y = self.w-1
                 if in_board(new_x, new_y):
                     agent.pos = (new_x, new_y)
         elif action == 1:
-            new_x = x + 1
-            new_y = y
+            new_x, new_y = move_backward(x, y, agent.face)
             if in_board(new_x, new_y):
                 agent.pos = (new_x, new_y)
-            elif new_x >= self.h:
-                new_x = 0
-                new_y = y
+            else:
+                if agent.face == 0:
+                    new_x = 0
+                    new_y = y
+                elif agent.face == 1:
+                    new_x = x
+                    new_y = self.w-1
+                elif agent.face == 2:
+                    new_x = self.h-1
+                    new_y = y
+                elif agent.face == 3:
+                    new_x = x
+                    new_y = 0
                 if in_board(new_x, new_y):
                     agent.pos = (new_x, new_y)
         elif action == 2:
+            new_x, new_y = move_left(x, y, agent.face)
             new_x = x
             new_y = y - 1
             if in_board(new_x, new_y):
                 agent.pos = (new_x, new_y)
-            elif new_y < 0:
-                new_x = x
-                new_y = self.w-1
+            else:
+                if agent.face == 0:
+                    new_x = x
+                    new_y = self.w-1
+                elif agent.face == 1:
+                    new_x = self.h-1
+                    new_y = y
+                elif agent.face == 2:
+                    new_x = x
+                    new_y = 0
+                elif agent.face == 3:
+                    new_x = 0
+                    new_y = y
                 if in_board(new_x, new_y):
                     agent.pos = (new_x, new_y)
         elif action == 3:
-            new_x = x
-            new_y = y + 1
+            new_x, new_y = move_right(x, y, agent.face)
             if in_board(new_x, new_y):
                 agent.pos = (new_x, new_y)
-            elif new_y >= self.w:
-                new_y = 0
-                new_x = x
+            else:
+                if agent.face == 0:
+                    new_x = x
+                    new_y = 0
+                elif agent.face == 1:
+                    new_x = 0
+                    new_y = y
+                elif agent.face == 2:
+                    new_x = x
+                    new_y = self.w-1
+                elif agent.face == 3:
+                    new_x = self.h-1
+                    new_y = y
                 if in_board(new_x, new_y):
                     agent.pos = (new_x, new_y)
+        elif action == 4:
+            agent.face = (agent.face + 4 - 1) % 4
+        elif action == 5:
+            self.face = (agent.face + 1) % 4
         else:
             print('Wrong action id')
 

@@ -194,7 +194,7 @@ class SimplePopulationDynamics(BaseEnv):
                 killed.append(agent.id)
                 x, y = agent.pos
                 self.map[x][y] = 0
-            elif agent.id in self.killed:
+            elif agent.id in self.killed.keys():
                 # change this later
                 killed.append(agent.id)
                 del self.preys[agent.id]
@@ -225,6 +225,8 @@ def get_obs(env, only_view=False):
     vision_height = env.vision_height
     global agents
     agents = env.agents
+    global predators
+    predators = env.predators
 
 
     global cpu_cores
@@ -263,10 +265,9 @@ def get_obs(env, only_view=False):
     if only_view:
         return obs
 
-    killed = []
-    for agent in agents.values():
-        killed.append(_get_killed(agent, killed))
-
+    killed = {}
+    for agent in predators.values():
+        _get_killed(agent, killed)
     killed = dict(killed)
 
     global _killed
@@ -279,6 +280,7 @@ def get_obs(env, only_view=False):
         pool.join()
     else:
         rewards = []
+        killed = []
         for agent in agents.values():
             reward = _get_reward(agent)
             rewards.append(reward)
@@ -296,7 +298,19 @@ def _get_obs(agent):
     x, y = agent.pos
     obs = np.zeros((4, vision_width, vision_height))
     obs[:3, :, :] = np.broadcast_to(np.array(_property[0][1]).reshape((3, 1, 1)), (3, vision_width, vision_height))
-    local_map = large_map[(w+x-vision_width//2):(w+x-vision_width//2+vision_width), (h+y-vision_height//2):(h+y-vision_height//2+vision_height)]
+
+    if agent.predator:
+        if agent.face == 0:
+            local_map = large_map[(w+x-vision_width//2):(w+x-vision_width//2+vision_width), (h+y):(h+y+vision_height)]
+        elif agent.face == 1:
+            local_map = large_map[(w+x-vision_width):(w+x), (h+y-vision_width//2):(h+y-vision_height//2+vision_height)]
+        elif agent.face == 2:
+            local_map = large_map[(w+x-vision_width//2):(w+x-vision_width//2+vision_width), (h+y):(h+y-vision_height)]
+        elif agent.face == 3:
+            local_map = large_map[(w+x):(w+x+vision_width), (h+y-vision_height//2):(h+y-vision_height//2+vision_height)]
+    else:
+        local_map = large_map[(w+x-vision_width//2):(w+x-vision_width//2+vision_width), (h+y-vision_height//2):(h+y-vision_height//2+vision_height)]
+
     agent_indices = np.where(local_map!=0)
     if len(agent_indices[0]) == 0:
         if obs_type == 'dense':
@@ -320,14 +334,20 @@ def _get_obs(agent):
         return (agent.id, obs)
 
 def _get_killed(agent, killed):
-    if not agent.predator:
-        return (agent.id, None)
+
     x, y = agent.pos
     min_dist = np.inf
     target_prey = None
     killed_id = None
 
-    local_map = large_map[(w+x-agent.hunt_square//2):(w+x-agent.hunt_square//2+agent.hunt_square), (h+y-agent.hunt_square//2):(h+y-agent.hunt_square//2+agent.hunt_square)]
+    if agent.face == 0:
+        local_map = large_map[(w+x-agent.hunt_square//2):(w+x-agent.hunt_square//2+agent.hunt_square), (h+y):(h+y+agent.hunt_square)]
+    elif agent.face == 1:
+        local_map = large_map[(w+x-agent.hunt_square):(w+x), (h+y-agent.hunt_square//2):(h+y-agent.hunt_square//2+agent.hunt_square)]
+    elif agent.face == 2:
+        local_map = large_map[(w+x-agent.hunt_square//2):(w+x-agent.hunt_square//2+agent.hunt_square), (h+y):(h+y-agent.hunt_square)]
+    elif agent.face == 3:
+        local_map = large_map[(w+x):(w+x+agent.hunt_square), (h+y-agent.hunt_square//2):(h+y-agent.hunt_square//2+agent.hunt_square)]
     agent_indices = np.where(local_map>0)
 
     if len(agent_indices[0]) == 0:
@@ -336,7 +356,7 @@ def _get_killed(agent, killed):
         id_ = local_map[candidate_x, candidate_y]
         candidate_agent = agents[id_]
 
-        if not candidate_agent.predator and not candidate_agent.id in dict(killed).values():
+        if not candidate_agent.predator:
             x_prey, y_prey = candidate_agent.pos
             dist = np.sqrt((x-x_prey)**2+(y-y_prey)**2)
             if dist < min_dist:
@@ -345,20 +365,25 @@ def _get_killed(agent, killed):
 
     if target_prey is not None:
         killed_id = target_prey.id
-    return (agent.id, killed_id)
+        if killed_id not in killed:
+            killed[killed_id] = [agent.id]
+        else:
+            killed[killed_id].append(agent.id)
+    return killed
 
 
 def _get_reward(agent):
     if agent.predator:
         reward = 0
-        if _killed[agent.id] is not None:
-            reward += 1
+        for value in _killed.values():
+            if agent.id in value:
+                reward += 1/len(value)
 
         if agent.health <= 0:
             reward -= 1
     else:
         reward = 0
-        if agent.id in _killed.values():
+        if agent.id in _killed.keys():
             reward -= 1
         #else:
         #    reward += 0.2
