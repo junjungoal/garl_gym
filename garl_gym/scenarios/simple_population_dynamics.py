@@ -143,6 +143,7 @@ class SimplePopulationDynamics(BaseEnv):
             agent.original_health = 1
             agent.birth_time = self.timestep
             agent.predator = True
+            agent.face = np.random.randint(4)
 
             agent.id = self.max_id
             self.max_id += 1
@@ -167,6 +168,7 @@ class SimplePopulationDynamics(BaseEnv):
             agent.original_health = 1
             agent.birth_time = self.timestep
             agent.predator = False
+            agent.face = np.random.randint(4)
 
             agent.id = self.max_id
             self.max_id += 1
@@ -194,7 +196,7 @@ class SimplePopulationDynamics(BaseEnv):
                 killed.append(agent.id)
                 x, y = agent.pos
                 self.map[x][y] = 0
-            elif agent.id in self.killed.keys():
+            elif agent.id in self.killed:
                 # change this later
                 killed.append(agent.id)
                 del self.preys[agent.id]
@@ -280,15 +282,14 @@ def get_obs(env, only_view=False):
         pool.join()
     else:
         rewards = []
-        killed = []
         for agent in agents.values():
             reward = _get_reward(agent)
             rewards.append(reward)
 
-    for id, killed_agent in killed.items():
-        if killed_agent is not None:
-            env.increase_health(agents[id])
-    killed = list(killed.values())
+    for killer_list in killed.values():
+        for killer_id in killer_list:
+            env.increase_health(agents[killer_id])
+    killed = list(killed.keys())
 
     return obs, dict(rewards), killed
 
@@ -301,13 +302,13 @@ def _get_obs(agent):
 
     if agent.predator:
         if agent.face == 0:
-            local_map = large_map[(w+x-vision_width//2):(w+x-vision_width//2+vision_width), (h+y):(h+y+vision_height)]
-        elif agent.face == 1:
             local_map = large_map[(w+x-vision_width):(w+x), (h+y-vision_width//2):(h+y-vision_height//2+vision_height)]
+        elif agent.face == 1:
+            local_map = large_map[(w+x-vision_width//2):(w+x-vision_width//2+vision_width), (h+y-vision_height):(h+y)]
         elif agent.face == 2:
-            local_map = large_map[(w+x-vision_width//2):(w+x-vision_width//2+vision_width), (h+y):(h+y-vision_height)]
+            local_map = large_map[(w+x+1):(w+x+vision_width+1), (h+y-vision_height//2):(h+y-vision_height//2+vision_height)]
         elif agent.face == 3:
-            local_map = large_map[(w+x):(w+x+vision_width), (h+y-vision_height//2):(h+y-vision_height//2+vision_height)]
+            local_map = large_map[(w+x-vision_width//2):(w+x-vision_width//2+vision_width), (h+y+1):(h+y+vision_height+1)]
     else:
         local_map = large_map[(w+x-vision_width//2):(w+x-vision_width//2+vision_width), (h+y-vision_height//2):(h+y-vision_height//2+vision_height)]
 
@@ -341,13 +342,13 @@ def _get_killed(agent, killed):
     killed_id = None
 
     if agent.face == 0:
-        local_map = large_map[(w+x-agent.hunt_square//2):(w+x-agent.hunt_square//2+agent.hunt_square), (h+y):(h+y+agent.hunt_square)]
-    elif agent.face == 1:
         local_map = large_map[(w+x-agent.hunt_square):(w+x), (h+y-agent.hunt_square//2):(h+y-agent.hunt_square//2+agent.hunt_square)]
+    elif agent.face == 1:
+        local_map = large_map[(w+x-agent.hunt_square//2):(w+x-agent.hunt_square//2+agent.hunt_square), (h+y-agent.hunt_square):(h+y)]
     elif agent.face == 2:
-        local_map = large_map[(w+x-agent.hunt_square//2):(w+x-agent.hunt_square//2+agent.hunt_square), (h+y):(h+y-agent.hunt_square)]
+        local_map = large_map[(w+x+1):(w+x+agent.hunt_square+1), (h+y-agent.hunt_square//2):(h+y-agent.hunt_square//2+agent.hunt_square)]
     elif agent.face == 3:
-        local_map = large_map[(w+x):(w+x+agent.hunt_square), (h+y-agent.hunt_square//2):(h+y-agent.hunt_square//2+agent.hunt_square)]
+        local_map = large_map[(w+x-agent.hunt_square//2):(w+x-agent.hunt_square//2+agent.hunt_square), (h+y+1):(h+y+agent.hunt_square+1)]
     agent_indices = np.where(local_map>0)
 
     if len(agent_indices[0]) == 0:
