@@ -8,9 +8,8 @@ from garl_gym.core import Agent
 import cv2
 
 class BaseEnv(object):
-    def make_world(self, wall_prob=0, wall_seed=10, food_prob=0.1, food_seed=10):
-        self.gen_wall(wall_prob, wall_seed)
-        self.gen_food(food_prob, food_seed)
+    def make_world(self, wall_prob=0, food_prob=0.1, seed=100):
+        self.gen_wall(wall_prob)
 
         predators = {}
         preys = {}
@@ -106,48 +105,49 @@ class BaseEnv(object):
                 self.decrease_health(agent)
             else:
                 self._take_action(agent, action)
+            agent.age += 1
 
     def _take_action(self, agent, action):
         def in_board(x, y):
             return not (x < 0 or x >= self.h or y < 0 or y >= self.w) and self.map[x][y] == 0
         x, y = agent.pos
         if action == 0:
-            new_x = x - 1
+            new_x = x - agent.speed
             new_y = y
             if in_board(new_x, new_y):
                 agent.pos = (new_x, new_y)
             elif new_x < 0:
-                new_x = self.h-1
+                new_x = self.h-agent.speed
                 new_y = y
                 if in_board(new_x, new_y):
                     agent.pos = (new_x, new_y)
         elif action == 1:
-            new_x = x + 1
+            new_x = x + agent.speed
             new_y = y
             if in_board(new_x, new_y):
                 agent.pos = (new_x, new_y)
             elif new_x >= self.h:
-                new_x = 0
+                new_x = agent.speed-1
                 new_y = y
                 if in_board(new_x, new_y):
                     agent.pos = (new_x, new_y)
         elif action == 2:
             new_x = x
-            new_y = y - 1
+            new_y = y - agent.speed
             if in_board(new_x, new_y):
                 agent.pos = (new_x, new_y)
             elif new_y < 0:
                 new_x = x
-                new_y = self.w-1
+                new_y = self.w-agent.speed
                 if in_board(new_x, new_y):
                     agent.pos = (new_x, new_y)
         elif action == 3:
             new_x = x
-            new_y = y + 1
+            new_y = y + agent.speed
             if in_board(new_x, new_y):
                 agent.pos = (new_x, new_y)
             elif new_y >= self.w:
-                new_y = 0
+                new_y = agent.speed-1
                 new_x = x
                 if in_board(new_x, new_y):
                     agent.pos = (new_x, new_y)
@@ -259,7 +259,6 @@ class BaseEnv(object):
     def gen_wall(self, prob=0, seed=10):
         if prob == 0:
             return
-        np.random.seed(seed)
 
         for i in range(self.h):
             for j in range(self.w):
@@ -311,6 +310,7 @@ class BaseEnv(object):
             y = ind[1][perm[i]]
             if self.map[x][y] == 0:
                 self.map[x][y] = agent.id
+                self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = agent.id
                 agent.pos = (x, y)
             self.predators[agent.id] = agent
 
@@ -333,6 +333,7 @@ class BaseEnv(object):
             y = ind[1][perm[i]]
             if self.map[x][y] == 0:
                 self.map[x][y] = agent.id
+                self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = agent.id
                 agent.pos = (x, y)
             self.preys[agent.id] = agent
 

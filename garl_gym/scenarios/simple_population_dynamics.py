@@ -85,7 +85,7 @@ class SimplePopulationDynamics(BaseEnv):
 
         self.increase_predators = 0
         self.increase_preys = 0
-        self.large_map = np.zeros((self.h*3, self.w*3))
+        self.large_map = np.zeros((self.w*3, self.h*3), dtype=np.int32)
 
 
     #@property
@@ -153,6 +153,7 @@ class SimplePopulationDynamics(BaseEnv):
             y = ind[1][perm[i]]
             if self.map[x][y] == 0:
                 self.map[x][y] = agent.id
+                self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = agent.id
                 agent.pos = (x, y)
             self.predators[agent.id] = agent
 
@@ -175,6 +176,7 @@ class SimplePopulationDynamics(BaseEnv):
             y = ind[1][perm[i]]
             if self.map[x][y] == 0:
                 self.map[x][y] = agent.id
+                self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = agent.id
                 agent.pos = (x, y)
             self.preys[agent.id] = agent
 
@@ -194,6 +196,7 @@ class SimplePopulationDynamics(BaseEnv):
                 killed.append(agent.id)
                 x, y = agent.pos
                 self.map[x][y] = 0
+                self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = 0
             elif agent.id in self.killed:
                 # change this later
                 killed.append(agent.id)
@@ -201,6 +204,7 @@ class SimplePopulationDynamics(BaseEnv):
                 self.prey_num -= 1
                 x, y = agent.pos
                 self.map[x][y] = 0
+                self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = 0
             else:
                 agent.age += 1
                 agent.crossover=False
@@ -211,7 +215,7 @@ class SimplePopulationDynamics(BaseEnv):
 
     def reset(self):
         self.__init__(self.args)
-        self.make_world(wall_prob=self.args.wall_prob, wall_seed=np.random.randint(5000), food_prob=self.args.food_prob)
+        self.make_world(wall_prob=self.args.wall_prob, food_prob=self.args.food_prob)
 
         return get_obs(self, only_view=True)
 
@@ -240,17 +244,14 @@ def get_obs(env, only_view=False):
     global obs_type
     obs_type = env.obs_type
     global large_map
-    large_map = np.zeros((w*3, h*3), dtype=np.int32)
-    for i in range(3):
-        for j in range(3):
-            large_map[w*i:w*(i+1), h*j:h*(j+1)] = _map
+    large_map = env.large_map
 
     if env.cpu_cores is None:
         cores = mp.cpu_count()
     else:
         cores = cpu_cores
 
-    if env.args.multiprocessing and len(agents)>6000:
+    if env.args.multiprocessing and len(agents)>4000:
         pool = mp.Pool(processes=cores)
         obs = pool.map(_get_obs, agents.values())
         pool.close()
@@ -272,7 +273,7 @@ def get_obs(env, only_view=False):
     global _killed
     _killed = killed
 
-    if env.args.multiprocessing and len(agents)>6000:
+    if env.args.multiprocessing and len(agents)>4000:
         pool = mp.Pool(processes=cores)
         rewards = pool.map(_get_reward, agents.values())
         pool.close()

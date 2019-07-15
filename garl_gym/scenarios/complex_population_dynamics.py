@@ -14,7 +14,7 @@ from garl_gym.core import DiscreteWorld, Agent
 from scipy.stats import norm
 
 
-class SimplePopulationDynamicsGA(BaseEnv):
+class ComplexPopulationDynamics(BaseEnv):
     '''
 -    args:
 -        - height
@@ -61,6 +61,12 @@ class SimplePopulationDynamicsGA(BaseEnv):
         self.max_health = args.max_health
         self.min_health = args.min_health
 
+        self.min_resilience = args.min_resilience
+        self.max_resilience = args.max_resilience
+
+        self.min_attack = args.min_attack
+        self.max_attack = args.max_attack
+
         self.max_id = 1
 
         self.rewards = None
@@ -87,6 +93,16 @@ class SimplePopulationDynamicsGA(BaseEnv):
         self.increase_preys = 0
         self.increase_predators = 0
         self.large_map = np.zeros((self.w*3, self.h*3), dtype=np.int32)
+
+        self.predator_health = []
+        self.prey_health = []
+        self.predator_attack = []
+        self.prey_attack = []
+        self.predator_resilience = []
+        self.prey_resilience = []
+
+        self.min_speed = args.min_speed
+        self.max_speed = args.max_speed
 
 
 
@@ -124,6 +140,11 @@ class SimplePopulationDynamicsGA(BaseEnv):
             agent.birth_time = self.timestep
             agent.life = np.random.normal(500, scale=100)
             agent.age = np.random.randint(150)
+
+            agent.resilience = np.random.uniform(self.min_resilience, self.max_resilience)
+            agent.gene_resilience = agent.resilience
+            agent.attack = np.random.uniform(self.min_attack, self.max_attack)
+            agent.gene_attack = agent.attack
             if i < self.predator_num:
                 agent.predator = True
                 agent.id = self.max_id
@@ -134,6 +155,8 @@ class SimplePopulationDynamicsGA(BaseEnv):
                 agent.predator = False
                 agent.id = i+1
                 agent.property = [self._gen_power(i+1), [1, 0, 0]]
+                agent.speed = np.random.randint(self.min_speed, self.max_speed)
+                agent.gene_speed = agent.speed
             new_embedding = np.random.normal(size=[self.agent_emb_dim])
             self.agent_embeddings[agent.id] = new_embedding
 
@@ -167,6 +190,65 @@ class SimplePopulationDynamicsGA(BaseEnv):
                 if food_prob < prob and self.map[i][j] != -1 and self.food_map[i][j] == 0:
                     self.food_map[i][j] = -2
                     self.num_food += 1
+
+    def add_predators(self, num):
+        self.increase_predators += num
+        ind = np.where(self.map == 0)
+        perm = np.random.permutation(np.arange(len(ind[0])))
+
+        for i in range(num):
+            agent = Agent()
+            health = np.random.uniform(self.min_health, self.max_health)
+            agent.health = health
+            agent.birth_time = self.timestep
+            agent.predator = True
+
+            agent.id = self.max_id
+            agent.attack = np.random.uniform(self.min_attack, self.max_attack)
+            agent.resilience = np.random.uniform(self.min_resilience, self.max_resilience)
+            agent.gene_attack = agent.attack
+            agent.gene_resilience = agent.resilience
+            self.max_id += 1
+            agent.speed = 1
+            agent.life = np.random.normal(500, 100)
+            agent.hunt_square = self.max_hunt_square
+            agent.property = [self._gen_power(agent.id), [0, 0, 1]]
+            x = ind[0][perm[i]]
+            y = ind[1][perm[i]]
+            if self.map[x][y] == 0:
+                self.map[x][y] = agent.id
+                self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = agent.id
+                agent.pos = (x, y)
+            self.predators[agent.id] = agent
+
+    def add_preys(self, num):
+        self.increase_preys += num
+        ind = np.where(self.map == 0)
+        perm = np.random.permutation(np.arange(len(ind[0])))
+        for i in range(num):
+            agent = Agent()
+            health = np.random.uniform(self.min_health, self.max_health)
+            agent.health = health
+            agent.birth_time = self.timestep
+            agent.predator = False
+            agent.life = np.random.normal(500, 100)
+            agent.attack = np.random.uniform(self.min_attack, self.max_attack)
+            agent.resilience = np.random.uniform(self.min_resilience, self.max_resilience)
+            agent.gene_attack = agent.attack
+            agent.gene_resilience = agent.resilience
+            agent.speed = np.random.randint(self.min_speed, self.max_speed)
+            agent.gene_speed = agent.speed
+
+            agent.id = self.max_id
+            self.max_id += 1
+            agent.property = [self._gen_power(agent.id), [1, 0, 0]]
+            x = ind[0][perm[i]]
+            y = ind[1][perm[i]]
+            if self.map[x][y] == 0:
+                self.map[x][y] = agent.id
+                self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = agent.id
+                agent.pos = (x, y)
+            self.preys[agent.id] = agent
 
 
 
@@ -220,7 +302,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
                 self.food_map[x][y] = -2
                 self.num_food += 1
 
-    def crossover_predator(self, crossover_scope=3, crossover_rate=0.001):
+    def crossover_predator(self, crossover_scope=3, crossover_rate=0.001, mutation_prob=0.001):
 
         ind = np.where(self.map == 0)
         perm = np.random.permutation(np.arange(len(ind[0])))
@@ -250,10 +332,32 @@ class SimplePopulationDynamicsGA(BaseEnv):
                             self.max_id += 1
                             new_embedding = np.random.normal(size=[self.agent_emb_dim])
                             self.agent_embeddings[child.id] = new_embedding
-                            child.spped = None
                             child.life = np.random.normal(500, scale=100)
                             child.predator = True
-                            child.health = 1
+
+                            rate = np.random.rand()
+
+                            if np.random.rand() < mutation_prob:
+                                child.health = (rate*predator.health+(1-rate)*candidate_agent.health) + np.random.normal()
+                            else:
+                                child.health = (rate*predator.health + (1-rate)*candidate_agent.health)
+
+                            if np.random.rand() < mutation_prob:
+                                child.attack = (rate*predator.gene_attack+(1-rate)*candidate_agent.gene_attack) + np.random.normal()
+                            else:
+                                child.attack = (rate*predator.gene_attack+(1-rate)*candidate_agent.gene_attack)
+
+                            if np.random.rand() < mutation_prob:
+                                child.resilience = (rate*predator.gene_resilience+(1-rate)*candidate_agent.gene_resilience) + np.random.normal()
+                            else:
+                                child.resilience = (rate*predator.gene_resilience+(1-rate)*candidate_agent.gene_resilience)
+
+                            child.gene_attack = child.attack
+                            child.gene_resilience = child.resilience
+
+                            predator.reward = child.gene_attack + child.gene_resilience
+                            candidate_agent.reward = child.gene_attack + child.gene_resilience
+
                             child.hunt_square = self.max_hunt_square
                             child.property = [self._gen_power(child.id), [0, 0, 1]]
                             x = ind[0][perm[index]]
@@ -270,7 +374,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
                             self.increase_predators += 1
                             flag = False
 
-    def crossover_prey(self, crossover_scope=3, crossover_rate=0.001):
+    def crossover_prey(self, crossover_scope=3, crossover_rate=0.001, mutation_prob=0.001):
         ind = np.where(self.map == 0)
         perm = np.random.permutation(np.arange(len(ind[0])))
         index = 0
@@ -301,6 +405,31 @@ class SimplePopulationDynamicsGA(BaseEnv):
                             child.predator = False
                             child.life = np.random.normal(500, scale=100)
                             child.health = 1
+
+                            rate = np.random.rand()
+                            if np.random.rand() < mutation_prob:
+                                child.attack = (rate*prey.gene_attack+(1-rate)*candidate_agent.gene_attack) + np.random.normal()
+                            else:
+                                child.attack = (rate*prey.gene_attack+(1-rate)*candidate_agent.gene_attack)
+
+                            if np.random.rand() < mutation_prob:
+                                child.resilience = (rate*prey.gene_resilience+(1-rate)*candidate_agent.gene_resilience) + np.random.normal()
+                            else:
+                                child.resilience = (rate*prey.gene_resilience+(1-rate)*candidate_agent.gene_resilience)
+
+                            if np.random.rand() < mutation_prob:
+                                speed = (rate*prey.gene_speed+(1-rate)*candidate_agent.gene_speed) + np.random.normal()
+                                speed = np.clip(speed, self.min_speed, self.max_speed)
+                                child.speed = int(speed)
+                            else:
+                                child.speed = int(np.round(rate*prey.gene_speed+(1-rate)*candidate_agent.gene_speed))
+
+                            child.gene_attack = child.attack
+                            child.gene_resilience = child.resilience
+                            child.gene_speed = child.speed
+                            prey.reward = child.gene_attack + child.gene_resilience
+                            candidate_agent.reward = child.gene_attack + child.gene_resilience
+
                             new_embedding = np.random.normal(size=[self.agent_emb_dim])
                             self.agent_embeddings[child.id] = new_embedding
                             child.hunt_square = self.max_hunt_square
@@ -320,12 +449,39 @@ class SimplePopulationDynamicsGA(BaseEnv):
                             self.increase_preys += 1
                             flag = False
 
+
+    def store_parameters(self, agent):
+        if agent.predator:
+            self.predator_health.append(agent.health)
+            self.predator_attack.append(agent.gene_attack)
+            self.predator_resilience.append(agent.gene_resilience)
+            self.predator_speed.append(agent.gene_speed)
+
+        else:
+            self.prey_health.append(agent.health)
+            self.prey_attack.append(agent.gene_attack)
+            self.prey_resilience.append(agent.gene_resilience)
+            self.prey_speed.append(agent.gene_speed)
+
+    def reset_parameters(self):
+        self.predator_health = []
+        self.prey_health = []
+        self.predator_attack = []
+        self.prey_attack = []
+        self.predator_resilience = []
+        self.prey_resilience = []
+        self.prey_speed = []
+        self.predator_speed = []
+
+
+
     def remove_dead_agents(self):
         killed = []
+        self.reset_parameters()
         for agent in self.agents.values():
             #if agent.health <= 0 or np.random.rand() < 0.05:
-            if agent.health <= 0:
-            #if (agent.health <= 0 or agent.age >= agent.life):
+            #if agent.health <= 0:
+            if (agent.health <= 0 or agent.age >= agent.life):
                 x, y = agent.pos
                 self.map[x][y] = 0
                 self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = 0
@@ -336,16 +492,21 @@ class SimplePopulationDynamicsGA(BaseEnv):
                     del self.preys[agent.id]
                     self.prey_num -= 1
                 killed.append(agent.id)
-            elif agent.id in self.killed:
-                # change this later
-                killed.append(agent.id)
-                del self.preys[agent.id]
-                self.prey_num -= 1
-                x, y = agent.pos
-                self.map[x][y] = 0
-                self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = 0
+            elif self.killed[agent.id] is not None and self.killed[agent.id] not in killed:
+                prey_id = self.killed[agent.id]
+                prey = self.agents[prey_id]
+                predator = agent
+
+                prey.resilience -= predator.attack
+                if prey.resilience <= 0:
+                    del self.preys[prey_id]
+                    killed.append(prey_id)
+                    self.prey_num -= 1
+                    x, y = prey.pos
+                    self.map[x][y] = 0
+                    self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = 0
             else:
-                agent.age += 1
+                self.store_parameters(agent)
                 agent.crossover=False
                 agent.checked = []
         self.killed = []
@@ -353,9 +514,6 @@ class SimplePopulationDynamicsGA(BaseEnv):
         self.increase_preys = 0
         return killed
 
-    def remove_dead_agent_emb(self, dead_list):
-        for id in dead_list:
-            del self.agent_embeddings[id]
 
     def reset(self):
         self.__init__(self.args)
@@ -411,21 +569,32 @@ def get_obs(env, only_view=False):
     if only_view:
         return obs
 
-    killed = []
-    for agent in agents.values():
-        killed.append(_get_killed(agent, killed))
+    #killed = []
+    #for agent in agents.values():
+    #    killed.append(_get_killed(agent))
 
-    killed = dict(killed)
+    #killed = dict(killed)
 
-    global _killed
-    _killed = killed
+    #global _killed
+    #_killed = killed
 
     if env.args.multiprocessing and len(agents)>4000:
         pool = mp.Pool(processes=cores)
+        killed = pool.map(_get_killed, agents.values())
+        killed = dict(killed)
+        global _killed
+        _killed = killed
         rewards = pool.map(_get_reward, agents.values())
         pool.close()
         pool.join()
     else:
+        killed = []
+        for agent in agents.values():
+            killed.append(_get_killed(agent))
+        killed = dict(killed)
+        global _killed
+        _killed = killed
+
         rewards = []
         for agent in agents.values():
             reward = _get_reward(agent)
@@ -434,7 +603,7 @@ def get_obs(env, only_view=False):
     for id, killed_agent in killed.items():
         if killed_agent is not None:
             env.increase_health(agents[id])
-    killed = list(killed.values())
+    #killed = list(killed.values())
 
     return obs, dict(rewards), killed
 
@@ -442,7 +611,7 @@ def get_obs(env, only_view=False):
 
 def _get_obs(agent):
     x, y = agent.pos
-    obs = np.zeros((4, vision_width, vision_height))
+    obs = np.zeros((6, vision_width, vision_height))
     obs[:3, :, :] = np.broadcast_to(np.array(_property[0][1]).reshape((3, 1, 1)), (3, vision_width, vision_height))
     local_map = large_map[(w+x-vision_width//2):(w+x-vision_width//2+vision_width), (h+y-vision_height//2):(h+y-vision_height//2+vision_height)]
     agent_indices = np.where(local_map!=0)
@@ -460,6 +629,8 @@ def _get_obs(agent):
             other_agent = agents[local_map[other_x, other_y]]
             obs[:3, other_x, other_y] = other_agent.property[1]
             obs[3, other_x, other_y] = other_agent.health
+            obs[4, other_x, other_y] = other_agent.attack
+            obs[5, other_x, other_y] = other_agent.resilience
 
 
     if obs_type == 'dense':
@@ -467,7 +638,7 @@ def _get_obs(agent):
     else:
         return (agent.id, obs)
 
-def _get_killed(agent, killed):
+def _get_killed(agent):
     if not agent.predator:
         return (agent.id, None)
     x, y = agent.pos
@@ -484,7 +655,7 @@ def _get_killed(agent, killed):
         id_ = local_map[candidate_x, candidate_y]
         candidate_agent = agents[id_]
 
-        if not candidate_agent.predator and not candidate_agent.id in dict(killed).values():
+        if not candidate_agent.predator:
             x_prey, y_prey = candidate_agent.pos
             dist = np.sqrt((x-x_prey)**2+(y-y_prey)**2)
             if dist < min_dist:
@@ -504,7 +675,8 @@ def _get_reward(agent):
             reward += 1
 
         if agent.crossover:
-            reward += 1.5
+            reward += 1
+            #reward += agent.reward
 
         if agent.health <= 0:
             reward -= 2
@@ -513,7 +685,8 @@ def _get_reward(agent):
             reward -= 2
 
         if agent.crossover:
-            reward += 1.5
+            reward += 1
+            #reward += agent.reward
         #else:
         #    reward += 0.2
 

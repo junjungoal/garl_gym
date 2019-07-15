@@ -43,9 +43,11 @@ class Agent(object):
         self.dead = False
         self.original_health = None
         self.crossover=False
-        self.speed = None # how many cells the agent can moves
+        self.speed = 1 # how many cells the agent can moves
+        self.gene_speed = 1
         self.hunt_square = None
         self.max_reward = 0
+        self.reward = 0
         self.birth_time = None
         self.age = 0
         self.get_closer = False
@@ -58,6 +60,10 @@ class Agent(object):
         self.fail_crossover = False
         self.checked = []
         self.life = None
+        self.attack = None
+
+        self.gene_resilience = None
+        self.gene_attack = None
 
     def utility(self):
         if self.predator:
