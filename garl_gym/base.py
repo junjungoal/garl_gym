@@ -39,8 +39,8 @@ class BaseEnv(object):
             agent.original_health = health
             agent.birth_time = self.timestep
 
-            life = np.random.normal(loc=500, scale=100)
-            agent.life = life
+            agent.life = np.random.normal(500, scale=100)
+            agent.age = np.random.randint(150)
             if i < self.predator_num:
                 agent.predator = True
                 agent.id = self.max_id
@@ -67,6 +67,7 @@ class BaseEnv(object):
             x = empty_cells_ind[0][perm[i]]
             y = empty_cells_ind[1][perm[i]]
             self.map[x][y] = self.max_id
+            self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = self.max_id
             agent.pos = (x, y)
             self.max_id += 1
 
@@ -91,8 +92,6 @@ class BaseEnv(object):
             self.trained_preys = trained_preys
             self.training_preys = training_preys
 
-            self.predators = {**self.random_predators, **self.trained_predators, **self.training_predators}
-            self.preys = {**self.random_preys, **self.trained_preys, **self.training_preys}
 
     def make_world(self, wall_prob=0, food_prob=0.1, seed=100):
         self.gen_wall(wall_prob)
@@ -112,8 +111,8 @@ class BaseEnv(object):
             agent.original_health = health
             agent.birth_time = self.timestep
 
-            life = np.random.normal(loc=500, scale=100)
-            agent.life = life
+            agent.life = np.random.normal(500, scale=100)
+            agent.age = np.random.randint(150)
             if i < self.predator_num:
                 agent.predator = True
                 agent.id = self.max_id
@@ -128,6 +127,7 @@ class BaseEnv(object):
             x = empty_cells_ind[0][perm[i]]
             y = empty_cells_ind[1][perm[i]]
             self.map[x][y] = self.max_id
+            self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = self.max_id
             agent.pos = (x, y)
             self.max_id += 1
 
@@ -379,6 +379,10 @@ class BaseEnv(object):
         ind = np.where(self.map == 0)
         perm = np.random.permutation(np.arange(len(ind[0])))
 
+        if self.experiment_type == 'variation':
+            total = len(self.random_predators) + len(self.trained_predators) + len(self.training_predators)
+            p=[len(self.random_predators)/total, len(self.trained_predators)/total, len(self.training_predators)/total]
+
         for i in range(num):
             agent = Agent()
             agent.health = 1
@@ -398,12 +402,28 @@ class BaseEnv(object):
                 self.map[x][y] = agent.id
                 self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = agent.id
                 agent.pos = (x, y)
-            self.predators[agent.id] = agent
+                self.predator_num += 1
+                if self.experiment_type == 'variation':
+                    exp_type = np.random.choice(3, p=p)
+                    if exp_type == 0:
+                        agent.policy_type = 'random'
+                        self.random_predators[agent.id] = agent
+                    elif exp_type == 1:
+                        agent.policy_type = 'trained'
+                        self.trained_predators[agent.id] = agent
+                    else:
+                        agent.policy_type = 'training'
+                        self.training_predators[agent.id] = agent
+                else:
+                    self.predators[agent.id] = agent
 
     def add_preys(self, num):
         self.increase_preys += num
         ind = np.where(self.map == 0)
         perm = np.random.permutation(np.arange(len(ind[0])))
+        if self.experiment_type == 'variation':
+            total = len(self.random_preys) + len(self.trained_preys) + len(self.training_preys)
+            p=[len(self.random_preys)/total, len(self.trained_preys)/total, len(self.training_preys)/total]
         for i in range(num):
             agent = Agent()
             agent.health = 1
@@ -419,9 +439,22 @@ class BaseEnv(object):
             y = ind[1][perm[i]]
             if self.map[x][y] == 0:
                 self.map[x][y] = agent.id
+                self.prey_num += 1
                 self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = agent.id
                 agent.pos = (x, y)
-            self.preys[agent.id] = agent
+                if self.experiment_type == 'variation':
+                    exp_type = np.random.choice(3, p=p)
+                    if exp_type == 0:
+                        agent.policy_type = 'random'
+                        self.random_preys[agent.id] = agent
+                    elif exp_type == 1:
+                        agent.policy_type = 'trained'
+                        self.trained_preys[agent.id] = agent
+                    else:
+                        agent.policy_type = 'training'
+                        self.training_preys[agent.id] = agent
+                else:
+                    self.preys[agent.id] = agent
 
     def return_total_reward(self, rewards):
         total_pred_reward = 0

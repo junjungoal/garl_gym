@@ -126,7 +126,6 @@ class ComplexPopulationDynamics(BaseEnv):
 
     def make_world(self, wall_prob=0, wall_seed=10, food_prob=0.1, food_seed=10):
         self.gen_wall(wall_prob, wall_seed)
-        self.gen_food(food_prob, food_seed)
 
         predators = {}
         preys = {}
@@ -186,14 +185,6 @@ class ComplexPopulationDynamics(BaseEnv):
             #self.l_predators = self.predators
             #self.l_preys = self.preys
 
-
-    def gen_food(self, prob=0.1, seed=10):
-        for i in range(self.h):
-            for j in range(self.w):
-                food_prob = np.random.rand()
-                if food_prob < prob and self.map[i][j] != -1 and self.food_map[i][j] == 0:
-                    self.food_map[i][j] = -2
-                    self.num_food += 1
 
     def add_predators(self, num):
         self.increase_predators += num

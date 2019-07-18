@@ -87,9 +87,38 @@ class SimplePopulationDynamicsGA(BaseEnv):
         self.increase_preys = 0
         self.increase_predators = 0
         self.large_map = np.zeros((self.w*3, self.h*3), dtype=np.int32)
+        if hasattr(args, 'experiment_type'):
+            self.experiment_type = args.experiment_type
+        else:
+            self.experiment_type = None
 
 
 
+    @property
+    def random_agents(self):
+        return {**self.random_predators, **self.random_preys}
+
+    @property
+    def trained_agents(self):
+        return {**self.trained_predators, **self.trained_preys}
+
+    @property
+    def training_agents(self):
+        return {**self.training_predators, **self.training_preys}
+
+    @property
+    def predator_agents(self):
+        if self.experiment_type == 'variation':
+            return {**self.random_predators, **self.trained_predators, **self.training_predators}
+        else:
+            return self.predators
+
+    @property
+    def prey_agents(self):
+        if self.experiment_type == 'variation':
+            return {**self.random_preys, **self.trained_preys, **self.training_preys}
+        else:
+            return self.preys
     #@property
     #def predators(self):
     #    return self.agents[:self.predator_num]
@@ -100,74 +129,10 @@ class SimplePopulationDynamicsGA(BaseEnv):
 
     @property
     def agents(self):
-        return {**self.predators, **self.preys}
-
-
-
-    def make_world(self, wall_prob=0, wall_seed=10, food_prob=0.1, food_seed=10):
-        self.gen_wall(wall_prob, wall_seed)
-        self.gen_food(food_prob, food_seed)
-
-        predators = {}
-        preys = {}
-
-        agents = [Agent() for _ in range(self.predator_num + self.prey_num)]
-
-        empty_cells_ind = np.where(self.map == 0)
-        perm = np.random.permutation(range(len(empty_cells_ind[0])))
-
-        for i, agent in enumerate(agents):
-            agent.name = 'agent {:d}'.format(i+1)
-            health = np.random.uniform(self.min_health, self.max_health)
-            agent.health = health
-            agent.original_health = health
-            agent.birth_time = self.timestep
-            agent.life = np.random.normal(500, scale=100)
-            agent.age = np.random.randint(150)
-            if i < self.predator_num:
-                agent.predator = True
-                agent.id = self.max_id
-                agent.speed = 1
-                agent.hunt_square = self.max_hunt_square
-                agent.property = [self._gen_power(i+1), [0, 0, 1]]
-            else:
-                agent.predator = False
-                agent.id = i+1
-                agent.property = [self._gen_power(i+1), [1, 0, 0]]
-            new_embedding = np.random.normal(size=[self.agent_emb_dim])
-            self.agent_embeddings[agent.id] = new_embedding
-
-            x = empty_cells_ind[0][perm[i]]
-            y = empty_cells_ind[1][perm[i]]
-            self.map[x][y] = self.max_id
-            agent.pos = (x, y)
-            self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = self.max_id
-            self.max_id += 1
-
-            if agent.predator:
-                predators[agent.id] = agent
-            else:
-                preys[agent.id] = agent
-
-            self.predators = predators
-            self.preys = preys
-            #lproxy = mp.Manager().list()
-            #lproxy.append({})
-            #lproxy.append({})
-            #self.l_predators = lproxy[0]
-            #self.l_preys = lproxy[1]
-            #self.l_predators = self.predators
-            #self.l_preys = self.preys
-
-
-    def gen_food(self, prob=0.1, seed=10):
-        for i in range(self.h):
-            for j in range(self.w):
-                food_prob = np.random.rand()
-                if food_prob < prob and self.map[i][j] != -1 and self.food_map[i][j] == 0:
-                    self.food_map[i][j] = -2
-                    self.num_food += 1
-
+        if self.experiment_type == 'variation':
+            return {**self.random_predators, **self.trained_predators, **self.training_predators, **self.random_preys, **self.trained_preys, **self.training_preys}
+        else:
+            return {**self.predators, **self.preys}
 
 
     def gen_wall(self, prob=0, seed=10):
@@ -225,7 +190,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
         ind = np.where(self.map == 0)
         perm = np.random.permutation(np.arange(len(ind[0])))
         index = 0
-        for predator in list(self.predators.values()):
+        for predator in list(self.predator_agents.values()):
             flag = True
             x, y = predator.pos
             local_map = self.large_map[(self.w+x-crossover_scope//2):(self.w+x-crossover_scope//2+crossover_scope), (self.h+y-crossover_scope//2):(self.h+y-crossover_scope//2+crossover_scope)]
@@ -239,7 +204,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
                 candidate_agent = self.agents[candidate_id]
                 predator.checked.append(candidate_agent.id)
                 if (candidate_agent.predator and not candidate_agent.crossover and predator.id != candidate_agent.id and \
-                    predator.id not in candidate_agent.checked and predator.age > self.args.min_crossover_age and len(self.predators) <= self.args.predator_capacity):
+                    predator.id not in candidate_agent.checked and predator.age > self.args.min_crossover_age and len(self.predator_agents) <= self.args.predator_capacity):
                     candidate_agent.get_closer = True
                     if np.random.rand() < crossover_rate and flag:
                         for i in range(np.random.randint(self.args.max_predator_offsprings)+1):
@@ -262,19 +227,33 @@ class SimplePopulationDynamicsGA(BaseEnv):
                             self.map[x][y] = child.id
                             self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = child.id
                             child.pos = (x, y)
-                            self.predators[child.id] = child
                             self.predator_num += 1
+                            self.increase_predators += 1
+                            flag = False
+                            if self.experiment_type == 'variation':
+                                rand = np.random.rand()
+                                if rand < 0.5:
+                                    child.policy_type = predator.policy_type
+                                else:
+                                    child.policy_type = candidate_agent.policy_type
+                                if child.policy_type == 'random':
+                                    self.random_predators[child.id] = child
+                                elif child.policy_type == 'trained':
+                                    self.trained_predators[child.id] = child
+                                else:
+                                    self.training_predators[child.id] = child
+                            else:
+                                self.predators[child.id] = child
+
                             ### decrease health?
                             #candidate_agent.health -= 0.1
                             #predator.health -= 0.1
-                            self.increase_predators += 1
-                            flag = False
 
     def crossover_prey(self, crossover_scope=3, crossover_rate=0.001):
         ind = np.where(self.map == 0)
         perm = np.random.permutation(np.arange(len(ind[0])))
         index = 0
-        for prey in list(self.preys.values()):
+        for prey in list(self.prey_agents.values()):
             x, y = prey.pos
             local_map = self.large_map[(self.w+x-crossover_scope//2):(self.w+x-crossover_scope//2+crossover_scope), (self.h+y-crossover_scope//2):(self.h+y-crossover_scope//2+crossover_scope)]
             agent_indices = np.where(local_map > 0)
@@ -289,7 +268,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
                 prey.checked.append(candidate_agent.id)
 
                 if (not candidate_agent.predator and not candidate_agent.crossover and candidate_agent.id != prey.id and \
-                        prey.id not in candidate_agent.checked and prey.age > self.args.min_crossover_age and len(self.preys) <= self.args.prey_capacity):
+                        prey.id not in candidate_agent.checked and prey.age > self.args.min_crossover_age and len(self.prey_agents) <= self.args.prey_capacity):
                     candidate_agent.get_closer = True
                     if np.random.rand() < crossover_rate and flag:
                         for i in range(np.random.randint(self.args.max_prey_offsprings)+1):
@@ -312,8 +291,21 @@ class SimplePopulationDynamicsGA(BaseEnv):
                             self.map[x][y] = child.id
                             self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = child.id
                             child.pos = (x, y)
-                            self.preys[child.id] = child
                             self.prey_num += 1
+                            if self.experiment_type == 'variation':
+                                rand = np.random.rand()
+                                if rand < 0.5:
+                                    child.policy_type = prey.policy_type
+                                else:
+                                    child.policy_type = candidate_agent.policy_type
+                                if child.policy_type == 'random':
+                                    self.random_preys[child.id] = child
+                                elif child.policy_type == 'trained':
+                                    self.trained_preys[child.id] = child
+                                else:
+                                    self.training_preys[child.id] = child
+                            else:
+                                self.preys[child.id] = child
 
                             #candidate_agent.health -= 0.1
                             #prey.health -= 0.1
@@ -330,16 +322,40 @@ class SimplePopulationDynamicsGA(BaseEnv):
                 self.map[x][y] = 0
                 self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = 0
                 if agent.predator:
-                    del self.predators[agent.id]
+                    if self.experiment_type == 'variation':
+                        if agent.policy_type == 'random':
+                            del self.random_predators[agent.id]
+                        elif agent.policy_type == 'trained':
+                            del self.trained_predators[agent.id]
+                        else:
+                            del self.training_predators[agent.id]
+                    else:
+                        del self.predators[agent.id]
                     self.predator_num -= 1
                 else:
-                    del self.preys[agent.id]
+                    if self.experiment_type == 'variation':
+                        if agent.policy_type == 'random':
+                            del self.random_preys[agent.id]
+                        elif agent.policy_type == 'trained':
+                            del self.trained_preys[agent.id]
+                        else:
+                            del self.training_preys[agent.id]
+                    else:
+                        del self.preys[agent.id]
                     self.prey_num -= 1
                 killed.append(agent.id)
             elif agent.id in self.killed:
                 # change this later
                 killed.append(agent.id)
-                del self.preys[agent.id]
+                if self.experiment_type == 'variation':
+                    if agent.policy_type == 'random':
+                        del self.random_preys[agent.id]
+                    elif agent.policy_type == 'trained':
+                        del self.trained_preys[agent.id]
+                    else:
+                        del self.training_preys[agent.id]
+                else:
+                    del self.preys[agent.id]
                 self.prey_num -= 1
                 x, y = agent.pos
                 self.map[x][y] = 0
@@ -360,9 +376,13 @@ class SimplePopulationDynamicsGA(BaseEnv):
     def reset(self):
         self.__init__(self.args)
         self.agent_embeddings = {}
-        self.make_world(wall_prob=self.args.wall_prob, wall_seed=np.random.randint(5000), food_prob=self.args.food_prob)
+        if self.experiment_type == 'variation':
+            self.variation_make_world(wall_prob=self.args.wall_prob)
+            return get_obs_with_variation(self, only_view=True)
+        else:
+            self.make_world(wall_prob=self.args.wall_prob, food_prob=self.args.food_prob)
 
-        return get_obs(self, only_view=True)
+            return get_obs(self, only_view=True)
 
 
 def get_obs(env, only_view=False):
@@ -518,6 +538,86 @@ def get_obs_with_variation(env, only_view=False):
     killed = list(killed.values())
 
     return (trained_obs, training_obs), dict(rewards), killed
+
+def get_obs_with_variation(env, only_view=False):
+    global agent_emb_dim
+    agent_emb_dim = env.agent_emb_dim
+    global vision_width
+    vision_width = env.vision_width
+    global vision_height
+    vision_height = env.vision_height
+    global agents
+    agents = env.agents
+
+    global random_agents
+    random_agents = env.random_agents
+    global trained_agents
+    trained_agents = env.trained_agents
+    global training_agents
+    training_agents = env.training_agents
+
+    global cpu_cores
+    cpu_cores = env.cpu_cores
+    global h
+    h = env.h
+    global w
+    w = env.w
+    global _map
+    _map = env.map
+    global _property
+    _property = env.property
+    global obs_type
+    obs_type = env.obs_type
+    global large_map
+    large_map = env.large_map
+
+    if env.cpu_cores is None:
+        cores = mp.cpu_count()
+    else:
+        cores = cpu_cores
+
+    if env.args.multiprocessing and len(agents)>4000:
+        pool = mp.Pool(processes=cores)
+        trained_obs = pool.map(_get_obs, trained_agents.values())
+        training_obs = pool.map(_get_obs, training_agents.values())
+        pool.close()
+        pool.join()
+    else:
+        trained_obs = []
+        training_obs = []
+        for agent in trained_agents.values():
+            trained_obs.append(_get_obs(agent))
+        for agent in training_agents.values():
+            training_obs.append(_get_obs(agent))
+
+    if only_view:
+        return (trained_obs, training_obs)
+
+    killed = []
+    for agent in agents.values():
+        killed.append(_get_killed(agent, killed))
+    killed = dict(killed)
+
+    global _killed
+    _killed = killed
+
+    if env.args.multiprocessing and len(agents)>4000:
+        pool = mp.Pool(processes=cores)
+        rewards = pool.map(_get_reward, training_agents.values())
+        pool.close()
+        pool.join()
+    else:
+        rewards = []
+        for agent in training_agents.values():
+            reward = _get_reward(agent)
+            rewards.append(reward)
+
+    for id, killed_agent in killed.items():
+        if killed_agent is not None:
+            env.increase_health(agents[id])
+    killed = list(killed.values())
+    return (trained_obs, training_obs), dict(rewards), killed
+
 
 
 

@@ -26,7 +26,7 @@ class SimplePopulationDynamics(BaseEnv):
         - damage_per_step
 
     In the future, we define the attack ?
-    If continuous, then size and speed?
+    If continuous, then  and speed?
     '''
 
     def __init__(self, args):
@@ -155,8 +155,9 @@ class SimplePopulationDynamics(BaseEnv):
 
         ind = np.where(self.map == 0)
         perm = np.random.permutation(np.arange(len(ind[0])))
-        total = len(self.random_predators) + len(self.trained_predators) + len(self.training_predators)
-        p=[len(self.random_predators)/total, len(self.trained_predators)/total, len(self.training_predators)/total]
+        if self.experiment_type == 'variation':
+            total = len(self.random_predators) + len(self.trained_predators) + len(self.training_predators)
+            p=[len(self.random_predators)/total, len(self.trained_predators)/total, len(self.training_predators)/total]
 
         for i in range(num):
             agent = Agent()
@@ -196,8 +197,9 @@ class SimplePopulationDynamics(BaseEnv):
         self.increase_preys = num
         ind = np.where(self.map == 0)
         perm = np.random.permutation(np.arange(len(ind[0])))
-        total = len(self.random_preys) + len(self.trained_preys) + len(self.training_preys)
-        p=[len(self.random_preys)/total, len(self.trained_preys)/total, len(self.training_preys)/total]
+        if self.experiment_type == 'variation':
+            total = len(self.random_preys) + len(self.trained_preys) + len(self.training_preys)
+            p=[len(self.random_preys)/total, len(self.trained_preys)/total, len(self.training_preys)/total]
         for i in range(num):
             agent = Agent()
             agent.health = 1
