@@ -87,6 +87,11 @@ class SimplePopulationDynamics(BaseEnv):
         self.increase_preys = 0
         self.large_map = np.zeros((self.w*3, self.h*3), dtype=np.int32)
 
+        if hasattr(args, 'experiment_type'):
+            self.experiment_type = args.experiment_type
+        else:
+            self.experiment_type = None
+
 
     #@property
     #def predators(self):
@@ -98,8 +103,22 @@ class SimplePopulationDynamics(BaseEnv):
 
     @property
     def agents(self):
-        return {**self.predators, **self.preys}
+        if self.experiment_type == 'variation':
+            return {**self.random_predators, **self.trained_predators, **self.training_predators, **self.random_preys, **self.trained_preys, **self.training_preys}
+        else:
+            return {**self.predators, **self.preys}
 
+    @property
+    def random_agents(self):
+        return {**self.random_predators, **self.random_preys}
+
+    @property
+    def trained_agents(self):
+        return {**self.trained_predators, **self.trained_preys}
+
+    @property
+    def training_agents(self):
+        return {**self.training_predators, **self.training_preys}
 
 
 
@@ -131,11 +150,13 @@ class SimplePopulationDynamics(BaseEnv):
                 self.num_food += 1
 
     def increase_predator(self, prob):
-        num = max(1, int(len(self.predators) * prob))
+        num = max(1, int(self.predator_num* prob))
         self.increase_predators = num
 
         ind = np.where(self.map == 0)
         perm = np.random.permutation(np.arange(len(ind[0])))
+        total = len(self.random_predators) + len(self.trained_predators) + len(self.training_predators)
+        p=[len(self.random_predators)/total, len(self.trained_predators)/total, len(self.training_predators)/total]
 
         for i in range(num):
             agent = Agent()
@@ -155,13 +176,28 @@ class SimplePopulationDynamics(BaseEnv):
                 self.map[x][y] = agent.id
                 self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = agent.id
                 agent.pos = (x, y)
-            self.predators[agent.id] = agent
+                if self.experiment_type == 'variation':
+                    exp_type = np.random.choice(3, p=p)
+                    if exp_type == 0:
+                        agent.policy_type = 'random'
+                        self.random_predators[agent.id] = agent
+                    elif exp_type == 1:
+                        agent.policy_type = 'trained'
+                        self.trained_predators[agent.id] = agent
+                    else:
+                        agent.policy_type = 'training'
+                        self.training_predators[agent.id] = agent
+                else:
+                    self.predators[agent.id] = agent
+                self.predator_num += 1
 
     def increase_prey(self, prob):
-        num = max(1, int(len(self.preys) * prob))
+        num = max(1, int(self.prey_num* prob))
         self.increase_preys = num
         ind = np.where(self.map == 0)
         perm = np.random.permutation(np.arange(len(ind[0])))
+        total = len(self.random_preys) + len(self.trained_preys) + len(self.training_preys)
+        p=[len(self.random_preys)/total, len(self.trained_preys)/total, len(self.training_preys)/total]
         for i in range(num):
             agent = Agent()
             agent.health = 1
@@ -178,8 +214,20 @@ class SimplePopulationDynamics(BaseEnv):
                 self.map[x][y] = agent.id
                 self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = agent.id
                 agent.pos = (x, y)
-            self.preys[agent.id] = agent
-
+                if self.experiment_type == 'variation':
+                    exp_type = np.random.choice(3, p=p)
+                    if exp_type == 0:
+                        agent.policy_type = 'random'
+                        self.random_preys[agent.id] = agent
+                    elif exp_type == 1:
+                        agent.policy_type = 'trained'
+                        self.trained_preys[agent.id] = agent
+                    else:
+                        agent.policy_type = 'trainig'
+                        self.training_preys[agent.id] = agent
+                else:
+                    self.preys[agent.id] = agent
+                self.prey_num += 1
 
     def remove_dead_agents(self):
         killed = []
@@ -188,10 +236,10 @@ class SimplePopulationDynamics(BaseEnv):
             #if agent.health <= 0:
             if (agent.health <= 0):
                 if agent.predator:
-                    del self.predators[agent.id]
+                    del self.agents[agent.id]
                     self.predator_num -= 1
                 else:
-                    del self.preys[agent.id]
+                    del self.agents[agent.id]
                     self.prey_num -= 1
                 killed.append(agent.id)
                 x, y = agent.pos
@@ -200,7 +248,7 @@ class SimplePopulationDynamics(BaseEnv):
             elif agent.id in self.killed:
                 # change this later
                 killed.append(agent.id)
-                del self.preys[agent.id]
+                del self.agents[agent.id]
                 self.prey_num -= 1
                 x, y = agent.pos
                 self.map[x][y] = 0
@@ -215,9 +263,12 @@ class SimplePopulationDynamics(BaseEnv):
 
     def reset(self):
         self.__init__(self.args)
-        self.make_world(wall_prob=self.args.wall_prob, food_prob=self.args.food_prob)
-
-        return get_obs(self, only_view=True)
+        if self.experiment_type == 'variation':
+            self.variation_make_world(wall_prob=self.args.wall_prob)
+            return get_obs_with_variation(self, only_view=True)
+        else:
+            self.make_world(wall_prob=self.args.wall_prob, food_prob=self.args.food_prob)
+            return get_obs(self, only_view=True)
 
 
 def get_obs(env, only_view=False):
@@ -292,6 +343,87 @@ def get_obs(env, only_view=False):
     return obs, dict(rewards), killed
 
 
+def get_obs_with_variation(env, only_view=False):
+    global agent_emb_dim
+    agent_emb_dim = env.agent_emb_dim
+    global vision_width
+    vision_width = env.vision_width
+    global vision_height
+    vision_height = env.vision_height
+    global agents
+    agents = env.agents
+
+    global random_agents
+    random_agents = env.random_agents
+    global trained_agents
+    trained_agents = env.trained_agents
+    global training_agents
+    training_agents = env.training_agents
+
+    global cpu_cores
+    cpu_cores = env.cpu_cores
+    global h
+    h = env.h
+    global w
+    w = env.w
+    global _map
+    _map = env.map
+    global _property
+    _property = env.property
+    global obs_type
+    obs_type = env.obs_type
+    global large_map
+    large_map = env.large_map
+
+    if env.cpu_cores is None:
+        cores = mp.cpu_count()
+    else:
+        cores = cpu_cores
+
+    if env.args.multiprocessing and len(agents)>4000:
+        pool = mp.Pool(processes=cores)
+        trained_obs = pool.map(_get_obs, trained_agents.values())
+        training_obs = pool.map(_get_obs, training_agents.values())
+        pool.close()
+        pool.join()
+    else:
+        trained_obs = []
+        training_obs = []
+        for agent in trained_agents.values():
+            trained_obs.append(_get_obs(agent))
+        for agent in training_agents.values():
+            training_obs.append(_get_obs(agent))
+
+    if only_view:
+        return (trained_obs, training_obs)
+
+    killed = []
+    for agent in agents.values():
+        killed.append(_get_killed(agent, killed))
+    killed = dict(killed)
+
+    global _killed
+    _killed = killed
+
+    if env.args.multiprocessing and len(agents)>4000:
+        pool = mp.Pool(processes=cores)
+        rewards = pool.map(_get_reward, training_agents.values())
+        pool.close()
+        pool.join()
+    else:
+        rewards = []
+        for agent in training_agents.values():
+            reward = _get_reward(agent)
+            rewards.append(reward)
+
+    for id, killed_agent in killed.items():
+        if killed_agent is not None:
+            env.increase_health(agents[id])
+    killed = list(killed.values())
+    return (trained_obs, training_obs), dict(rewards), killed
+
+
+
 
 def _get_obs(agent):
     x, y = agent.pos
@@ -330,7 +462,6 @@ def _get_killed(agent, killed):
 
     local_map = large_map[(w+x-agent.hunt_square//2):(w+x-agent.hunt_square//2+agent.hunt_square), (h+y-agent.hunt_square//2):(h+y-agent.hunt_square//2+agent.hunt_square)]
     agent_indices = np.where(local_map>0)
-
     if len(agent_indices[0]) == 0:
         return (agent.id, None)
     for candidate_x, candidate_y in zip(agent_indices[0], agent_indices[1]):
@@ -346,6 +477,7 @@ def _get_killed(agent, killed):
 
     if target_prey is not None:
         killed_id = target_prey.id
+        return (agent.id, killed_id)
     return (agent.id, killed_id)
 
 

@@ -8,6 +8,92 @@ from garl_gym.core import Agent
 import cv2
 
 class BaseEnv(object):
+
+    def variation_make_world(self, wall_prob=0):
+        self.gen_wall(wall_prob)
+
+        random_predators = {}
+        trained_predators = {}
+        training_predators = {}
+        random_preys = {}
+        trained_preys = {}
+        training_preys = {}
+
+        agents = [Agent() for _ in range(self.predator_num + self.prey_num)]
+
+        empty_cells_ind = np.where(self.map == 0)
+        perm = np.random.permutation(range(len(empty_cells_ind[0])))
+
+        random_predator_num = int(self.predator_num/3.)
+        trained_predator_num = int(self.predator_num/3.)
+        training_predator_num = int(self.predator_num-random_predator_num-trained_predator_num)
+
+        random_prey_num = int(self.prey_num/3.)
+        trained_prey_num = int(self.prey_num/3.)
+        training_prey_num = int(self.prey_num-random_prey_num-trained_prey_num)
+
+
+        for i, agent in enumerate(agents):
+            health = np.random.uniform(self.min_health, self.max_health)
+            agent.health = health
+            agent.original_health = health
+            agent.birth_time = self.timestep
+
+            life = np.random.normal(loc=500, scale=100)
+            agent.life = life
+            if i < self.predator_num:
+                agent.predator = True
+                agent.id = self.max_id
+                agent.speed = 1
+                agent.hunt_square = self.max_hunt_square
+                agent.property = [self._gen_power(i+1), [0, 0, 1]]
+                if i < random_predator_num:
+                    agent.policy_type = 'random'
+                elif i >= random_predator_num and i < random_predator_num+trained_predator_num:
+                    agent.policy_type = 'trained'
+                else:
+                    agent.policy_type = 'training'
+            else:
+                agent.predator = False
+                agent.id = i+1
+                agent.property = [self._gen_power(i+1), [1, 0, 0]]
+
+                if i < random_prey_num + self.predator_num:
+                    agent.policy_type = 'random'
+                elif i >= random_prey_num+self.predator_num and i < random_prey_num+trained_prey_num+self.predator_num:
+                    agent.policy_type = 'trained'
+                else:
+                    agent.policy_type = 'training'
+            x = empty_cells_ind[0][perm[i]]
+            y = empty_cells_ind[1][perm[i]]
+            self.map[x][y] = self.max_id
+            agent.pos = (x, y)
+            self.max_id += 1
+
+            if agent.predator:
+                if agent.policy_type == 'random':
+                    random_predators[agent.id] = agent
+                elif agent.policy_type == 'trained':
+                    trained_predators[agent.id] = agent
+                else:
+                    training_predators[agent.id] = agent
+            else:
+                if agent.policy_type == 'random':
+                    random_preys[agent.id] = agent
+                elif agent.policy_type == 'trained':
+                    trained_preys[agent.id] = agent
+                else:
+                    training_preys[agent.id] = agent
+            self.random_predators = random_predators
+            self.trained_predators = trained_predators
+            self.training_predators = training_predators
+            self.random_preys = random_preys
+            self.trained_preys = trained_preys
+            self.training_preys = training_preys
+
+            self.predators = {**self.random_predators, **self.trained_predators, **self.training_predators}
+            self.preys = {**self.random_preys, **self.trained_preys, **self.training_preys}
+
     def make_world(self, wall_prob=0, food_prob=0.1, seed=100):
         self.gen_wall(wall_prob)
 
@@ -345,5 +431,8 @@ class BaseEnv(object):
                 total_pred_reward += reward
             else:
                 total_prey_reward += reward
-        return total_pred_reward / len(self.predators), total_prey_reward / len(self.preys)
+        if self.experiment_type == 'variation':
+            return total_pred_reward / len(self.trained_predators), total_prey_reward / len(self.trained_preys)
+        else:
+            return total_pred_reward / len(self.predators), total_prey_reward / len(self.preys)
 

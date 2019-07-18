@@ -103,6 +103,10 @@ class ComplexPopulationDynamics(BaseEnv):
 
         self.min_speed = args.min_speed
         self.max_speed = args.max_speed
+        if hasattr(args, 'experiment_type'):
+            self.experiment_type = args.experiment_type
+        else:
+            self.experiment_type = None
 
 
 
@@ -153,7 +157,7 @@ class ComplexPopulationDynamics(BaseEnv):
                 agent.property = [self._gen_power(i+1), [0, 0, 1]]
             else:
                 agent.predator = False
-                agent.id = i+1
+                agent.id = self.max_id
                 agent.property = [self._gen_power(i+1), [1, 0, 0]]
                 agent.speed = np.random.randint(self.min_speed, self.max_speed)
                 agent.gene_speed = agent.speed
@@ -325,8 +329,6 @@ class ComplexPopulationDynamics(BaseEnv):
                     candidate_agent.get_closer = True
                     if np.random.rand() < crossover_rate and flag:
                         for i in range(np.random.randint(self.args.max_predator_offsprings)+1):
-                            candidate_agent.crossover = True
-                            predator.crossover = True
                             child = Agent()
                             child.id = self.max_id
                             self.max_id += 1
@@ -346,7 +348,6 @@ class ComplexPopulationDynamics(BaseEnv):
                                 child.attack = (rate*predator.gene_attack+(1-rate)*candidate_agent.gene_attack) + np.random.normal()
                             else:
                                 child.attack = (rate*predator.gene_attack+(1-rate)*candidate_agent.gene_attack)
-
                             if np.random.rand() < mutation_prob:
                                 child.resilience = (rate*predator.gene_resilience+(1-rate)*candidate_agent.gene_resilience) + np.random.normal()
                             else:
@@ -372,6 +373,8 @@ class ComplexPopulationDynamics(BaseEnv):
                             #candidate_agent.health -= 0.1
                             #predator.health -= 0.1
                             self.increase_predators += 1
+                            candidate_agent.crossover = True
+                            predator.crossover = True
                             flag = False
 
     def crossover_prey(self, crossover_scope=3, crossover_rate=0.001, mutation_prob=0.001):
@@ -397,8 +400,6 @@ class ComplexPopulationDynamics(BaseEnv):
                     candidate_agent.get_closer = True
                     if np.random.rand() < crossover_rate and flag:
                         for i in range(np.random.randint(self.args.max_prey_offsprings)+1):
-                            candidate_agent.crossover = True
-                            prey.crossover = True
                             child = Agent()
                             child.id = self.max_id
                             self.max_id += 1
@@ -434,7 +435,6 @@ class ComplexPopulationDynamics(BaseEnv):
                             self.agent_embeddings[child.id] = new_embedding
                             child.hunt_square = self.max_hunt_square
                             child.property = [self._gen_power(child.id), [1, 0, 0]]
-                            new_pos_indices = np.where(local_map == 0)
                             x = ind[0][perm[index]]
                             y = ind[1][perm[index]]
                             index += 1
@@ -448,6 +448,8 @@ class ComplexPopulationDynamics(BaseEnv):
                             #prey.health -= 0.1
                             self.increase_preys += 1
                             flag = False
+                            candidate_agent.crossover = True
+                            prey.crossover = True
 
 
     def store_parameters(self, agent):
@@ -480,18 +482,20 @@ class ComplexPopulationDynamics(BaseEnv):
         self.reset_parameters()
         for agent in self.agents.values():
             #if agent.health <= 0 or np.random.rand() < 0.05:
-            #if agent.health <= 0:
-            if (agent.health <= 0 or agent.age >= agent.life):
+            if agent.health <= 0:
+            #if (agent.health <= 0 or agent.age >= agent.life):
                 x, y = agent.pos
                 self.map[x][y] = 0
                 self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = 0
                 if agent.predator:
                     del self.predators[agent.id]
                     self.predator_num -= 1
+                    killed.append(agent.id)
                 else:
-                    del self.preys[agent.id]
-                    self.prey_num -= 1
-                killed.append(agent.id)
+                    if agentid in self.preys.keys():
+                        del self.preys[agent.id]
+                        self.prey_num -= 1
+                        killed.append(agent.id)
             elif self.killed[agent.id] is not None and self.killed[agent.id] not in killed:
                 prey_id = self.killed[agent.id]
                 prey = self.agents[prey_id]
@@ -594,6 +598,8 @@ def get_obs(env, only_view=False):
         killed = dict(killed)
         global _killed
         _killed = killed
+        global killed_preys
+        killed_preys = list(killed.values())
 
         rewards = []
         for agent in agents.values():
@@ -672,7 +678,8 @@ def _get_reward(agent):
     reward = 0
     if agent.predator:
         if _killed[agent.id] is not None:
-            reward += 1
+            num = killed_preys.count(_killed[agent.id])
+            reward += 1./num
 
         if agent.crossover:
             reward += 1

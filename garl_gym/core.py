@@ -61,6 +61,7 @@ class Agent(object):
         self.checked = []
         self.life = None
         self.attack = None
+        self.policy_type = None
 
         self.gene_resilience = None
         self.gene_attack = None

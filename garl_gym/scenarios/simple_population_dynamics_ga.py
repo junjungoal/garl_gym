@@ -438,6 +438,87 @@ def get_obs(env, only_view=False):
 
     return obs, dict(rewards), killed
 
+def get_obs_with_variation(env, only_view=False):
+    global agent_emb_dim
+    agent_emb_dim = env.agent_emb_dim
+    global vision_width
+    vision_width = env.vision_width
+    global vision_height
+    vision_height = env.vision_height
+    global agents
+    agents = env.agents
+
+    global random_agents
+    random_agents = env.random_agents
+    global trained_agents
+    trained_agents = env.trained_agents
+    global training_agents
+    training_agents = env.training_agents
+
+    global cpu_cores
+    cpu_cores = env.cpu_cores
+    global h
+    h = env.h
+    global w
+    w = env.w
+    global _map
+    _map = env.map
+    global _property
+    _property = env.property
+    global obs_type
+    obs_type = env.obs_type
+    global large_map
+    large_map = env.large_map
+
+    if env.cpu_cores is None:
+        cores = mp.cpu_count()
+    else:
+        cores = cpu_cores
+
+    if env.args.multiprocessing and len(agents)>4000:
+        pool = mp.Pool(processes=cores)
+        trained_obs = pool.map(_get_obs, trained_agents.values())
+        training_obs = pool.map(_get_obs, training_agents.values())
+        pool.close()
+        pool.join()
+    else:
+        trained_obs = []
+        training_obs = []
+        for agent in trained_agents.values():
+            trained_obs.append(_get_obs(agent))
+        for agent in training_agents.values():
+            training_obs.append(_get_obs(agent))
+
+    if only_view:
+        return (trained_obs, training_obs)
+
+    killed = []
+    for agent in agents.values():
+        killed.append(_get_killed(agent, killed))
+
+    killed = dict(killed)
+
+    global _killed
+    _killed = killed
+
+    if env.args.multiprocessing and len(agents)>4000:
+        pool = mp.Pool(processes=cores)
+        rewards = pool.map(_get_reward, training_agents.values())
+        pool.close()
+        pool.join()
+    else:
+        rewards = []
+        for agent in training_agents.values():
+            reward = _get_reward(agent)
+            rewards.append(reward)
+
+    for id, killed_agent in killed.items():
+        if killed_agent is not None:
+            env.increase_health(agents[id])
+    killed = list(killed.values())
+
+    return (trained_obs, training_obs), dict(rewards), killed
+
 
 
 def _get_obs(agent):
