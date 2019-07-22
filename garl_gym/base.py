@@ -465,7 +465,7 @@ class BaseEnv(object):
             else:
                 total_prey_reward += reward
         if self.experiment_type == 'variation':
-            return total_pred_reward / len(self.trained_predators), total_prey_reward / len(self.trained_preys)
+            return total_pred_reward / (len(self.trained_predators)+1e-8), total_prey_reward / (len(self.trained_preys)+1e-8)
         else:
             return total_pred_reward / len(self.predators), total_prey_reward / len(self.preys)
 

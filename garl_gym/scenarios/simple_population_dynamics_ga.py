@@ -683,18 +683,22 @@ def _get_reward(agent):
     if agent.predator:
         if _killed[agent.id] is not None:
             reward += 1
+        else:
+            reward -= 0.001
 
         if agent.crossover:
-            reward += 1.5
+            reward += 1
 
         if agent.health <= 0:
             reward -= 2
     else:
         if agent.id in _killed.values() or agent.health  <= 0:
             reward -= 2
+        else:
+            reward += 0.001
 
         if agent.crossover:
-            reward += 1.5
+            reward += 1
         #else:
         #    reward += 0.2
 

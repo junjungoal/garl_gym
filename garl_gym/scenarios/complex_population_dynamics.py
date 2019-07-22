@@ -576,9 +576,15 @@ def get_obs(env, only_view=False):
     if env.args.multiprocessing and len(agents)>4000:
         pool = mp.Pool(processes=cores)
         killed = pool.map(_get_killed, agents.values())
+        pool.close()
         killed = dict(killed)
         global _killed
         _killed = killed
+
+        global killed_preys
+        killed_preys = list(killed.values())
+
+        pool = mp.Pool(processes=cores)
         rewards = pool.map(_get_reward, agents.values())
         pool.close()
         pool.join()
