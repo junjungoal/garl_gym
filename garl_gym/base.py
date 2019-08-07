@@ -112,7 +112,7 @@ class BaseEnv(object):
             agent.birth_time = self.timestep
 
             agent.life = np.random.normal(500, scale=100)
-            agent.age = np.random.randint(150)
+            agent.age = np.random.randint(350)
             if i < self.predator_num:
                 agent.predator = True
                 agent.id = self.max_id
@@ -203,7 +203,7 @@ class BaseEnv(object):
             if in_board(new_x, new_y):
                 agent.pos = (new_x, new_y)
             elif new_x < 0:
-                new_x = self.h-agent.speed
+                new_x = self.w + (x-agent.speed)
                 new_y = y
                 if in_board(new_x, new_y):
                     agent.pos = (new_x, new_y)
@@ -213,7 +213,7 @@ class BaseEnv(object):
             if in_board(new_x, new_y):
                 agent.pos = (new_x, new_y)
             elif new_x >= self.h:
-                new_x = agent.speed-1
+                new_x = x+agent.speed-self.w
                 new_y = y
                 if in_board(new_x, new_y):
                     agent.pos = (new_x, new_y)
@@ -224,7 +224,7 @@ class BaseEnv(object):
                 agent.pos = (new_x, new_y)
             elif new_y < 0:
                 new_x = x
-                new_y = self.w-agent.speed
+                new_y = self.h + (y-agent.speed)
                 if in_board(new_x, new_y):
                     agent.pos = (new_x, new_y)
         elif action == 3:
@@ -233,7 +233,7 @@ class BaseEnv(object):
             if in_board(new_x, new_y):
                 agent.pos = (new_x, new_y)
             elif new_y >= self.w:
-                new_y = agent.speed-1
+                new_y = y+agent.speed-self.h
                 new_x = x
                 if in_board(new_x, new_y):
                     agent.pos = (new_x, new_y)

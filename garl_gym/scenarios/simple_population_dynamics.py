@@ -172,40 +172,40 @@ class SimplePopulationDynamics(BaseEnv):
             total = len(self.random_predators) + len(self.trained_predators) + len(self.training_predators)
             p=[len(self.random_predators)/total, len(self.trained_predators)/total, len(self.training_predators)/total]
 
-        for i in range(len(self.predator_agents)):
-        #for i in range(num):
-            if np.random.rand() < prob:
-                agent = Agent()
-                agent.health = 1
-                agent.original_health = 1
-                agent.birth_time = self.timestep
-                agent.predator = True
+        #for i in range(len(self.predator_agents)):
+        for i in range(num):
+            #if np.random.rand() < prob:
+            agent = Agent()
+            agent.health = 1
+            agent.original_health = 1
+            agent.birth_time = self.timestep
+            agent.predator = True
 
-                agent.id = self.max_id
-                self.max_id += 1
-                agent.speed = 1
-                agent.hunt_square = self.max_hunt_square
-                agent.property = [self._gen_power(agent.id), [0, 0, 1]]
-                x = ind[0][perm[i]]
-                y = ind[1][perm[i]]
-                if self.map[x][y] == 0:
-                    self.map[x][y] = agent.id
-                    self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = agent.id
-                    agent.pos = (x, y)
-                    if self.experiment_type == 'variation':
-                        exp_type = np.random.choice(3, p=p)
-                        if exp_type == 0:
-                            agent.policy_type = 'random'
-                            self.random_predators[agent.id] = agent
-                        elif exp_type == 1:
-                            agent.policy_type = 'trained'
-                            self.trained_predators[agent.id] = agent
-                        else:
-                            agent.policy_type = 'training'
-                            self.training_predators[agent.id] = agent
+            agent.id = self.max_id
+            self.max_id += 1
+            agent.speed = 1
+            agent.hunt_square = self.max_hunt_square
+            agent.property = [self._gen_power(agent.id), [0, 0, 1]]
+            x = ind[0][perm[i]]
+            y = ind[1][perm[i]]
+            if self.map[x][y] == 0:
+                self.map[x][y] = agent.id
+                self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = agent.id
+                agent.pos = (x, y)
+                if self.experiment_type == 'variation':
+                    exp_type = np.random.choice(3, p=p)
+                    if exp_type == 0:
+                        agent.policy_type = 'random'
+                        self.random_predators[agent.id] = agent
+                    elif exp_type == 1:
+                        agent.policy_type = 'trained'
+                        self.trained_predators[agent.id] = agent
                     else:
-                        self.predators[agent.id] = agent
-                    self.predator_num += 1
+                        agent.policy_type = 'training'
+                        self.training_predators[agent.id] = agent
+                else:
+                    self.predators[agent.id] = agent
+                self.predator_num += 1
 
     def increase_prey(self, prob):
         num = max(1, int(self.prey_num* prob))
@@ -215,59 +215,83 @@ class SimplePopulationDynamics(BaseEnv):
         if self.experiment_type == 'variation':
             total = len(self.random_preys) + len(self.trained_preys) + len(self.training_preys)
             p=[len(self.random_preys)/total, len(self.trained_preys)/total, len(self.training_preys)/total]
-        for i in range(len(self.predator_agents)):
-        #for i in range(num):
-            if np.random.rand() < prob:
-                agent = Agent()
-                agent.health = 1
-                agent.original_health = 1
-                agent.birth_time = self.timestep
-                agent.predator = False
+        #for i in range(len(self.predator_agents)):
+        for i in range(num):
+         #   if np.random.rand() < prob:
+            agent = Agent()
+            agent.health = 1
+            agent.original_health = 1
+            agent.birth_time = self.timestep
+            agent.predator = False
 
-                agent.id = self.max_id
-                self.max_id += 1
-                agent.property = [self._gen_power(agent.id), [1, 0, 0]]
-                x = ind[0][perm[i]]
-                y = ind[1][perm[i]]
-                if self.map[x][y] == 0:
-                    self.map[x][y] = agent.id
-                    self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = agent.id
-                    agent.pos = (x, y)
-                    if self.experiment_type == 'variation':
-                        exp_type = np.random.choice(3, p=p)
-                        if exp_type == 0:
-                            agent.policy_type = 'random'
-                            self.random_preys[agent.id] = agent
-                        elif exp_type == 1:
-                            agent.policy_type = 'trained'
-                            self.trained_preys[agent.id] = agent
-                        else:
-                            agent.policy_type = 'trainig'
-                            self.training_preys[agent.id] = agent
+            agent.id = self.max_id
+            self.max_id += 1
+            agent.property = [self._gen_power(agent.id), [1, 0, 0]]
+            x = ind[0][perm[i]]
+            y = ind[1][perm[i]]
+            if self.map[x][y] == 0:
+                self.map[x][y] = agent.id
+                self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = agent.id
+                agent.pos = (x, y)
+                if self.experiment_type == 'variation':
+                    exp_type = np.random.choice(3, p=p)
+                    if exp_type == 0:
+                        agent.policy_type = 'random'
+                        self.random_preys[agent.id] = agent
+                    elif exp_type == 1:
+                        agent.policy_type = 'trained'
+                        self.trained_preys[agent.id] = agent
                     else:
-                        self.preys[agent.id] = agent
-                    self.prey_num += 1
+                        agent.policy_type = 'trainig'
+                        self.training_preys[agent.id] = agent
+                else:
+                    self.preys[agent.id] = agent
+                self.prey_num += 1
 
     def remove_dead_agents(self):
         killed = []
         for agent in self.agents.values():
             #if agent.health <= 0 or np.random.rand() < 0.05:
-            #if agent.health <= 0:
-            if (agent.health <= 0):
-                if agent.predator:
-                    del self.predators[agent.id]
-                    self.predator_num -= 1
-                else:
-                    del self.preys[agent.id]
-                    self.prey_num -= 1
-                killed.append(agent.id)
+            if agent.health <= 0:
+            #if (agent.health <= 0 or agent.age >= agent.life):
                 x, y = agent.pos
                 self.map[x][y] = 0
                 self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = 0
+                if agent.predator:
+                    if self.experiment_type == 'variation':
+                        if agent.policy_type == 'random':
+                            del self.random_predators[agent.id]
+                        elif agent.policy_type == 'trained':
+                            del self.trained_predators[agent.id]
+                        else:
+                            del self.training_predators[agent.id]
+                    else:
+                        del self.predators[agent.id]
+                    self.predator_num -= 1
+                else:
+                    if self.experiment_type == 'variation':
+                        if agent.policy_type == 'random':
+                            del self.random_preys[agent.id]
+                        elif agent.policy_type == 'trained':
+                            del self.trained_preys[agent.id]
+                        else:
+                            del self.training_preys[agent.id]
+                    else:
+                        del self.preys[agent.id]
+                    self.prey_num -= 1
+                killed.append(agent.id)
             elif agent.id in self.killed:
                 # change this later
                 killed.append(agent.id)
-                del self.preys[agent.id]
+                if self.experiment_type == 'variation':
+                    if agent.policy_type == 'random':
+                        del self.random_preys[agent.id]
+                    elif agent.policy_type == 'trained':
+                        del self.trained_preys[agent.id]
+                    else:
+                        del self.training_preys[agent.id]
+                else:
+                    del self.preys[agent.id]
                 self.prey_num -= 1
                 x, y = agent.pos
                 self.map[x][y] = 0
@@ -275,6 +299,7 @@ class SimplePopulationDynamics(BaseEnv):
             else:
                 agent.age += 1
                 agent.crossover=False
+                agent.checked = []
         self.killed = []
         self.increase_predators = 0
         self.increase_preys = 0

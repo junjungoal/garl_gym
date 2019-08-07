@@ -14,7 +14,7 @@ from garl_gym.core import DiscreteWorld, Agent
 from scipy.stats import norm
 
 
-class ComplexPopulationDynamics(BaseEnv):
+class GeneticPopulationDynamics(BaseEnv):
     '''
 -    args:
 -        - height
@@ -297,153 +297,114 @@ class ComplexPopulationDynamics(BaseEnv):
                 self.food_map[x][y] = -2
                 self.num_food += 1
 
-    def crossover_predator(self, crossover_scope=3, crossover_rate=0.001, mutation_prob=0.001):
+    def crossover_predator(self, prob, mutation_prob=0.001):
 
+        num = max(1, int(self.predator_num* prob))
+        self.increase_predators = num
         ind = np.where(self.map == 0)
         perm = np.random.permutation(np.arange(len(ind[0])))
         index = 0
-        for predator in list(self.predators.values()):
-            flag = True
-            x, y = predator.pos
-            local_map = self.large_map[(self.w+x-crossover_scope//2):(self.w+x-crossover_scope//2+crossover_scope), (self.h+y-crossover_scope//2):(self.h+y-crossover_scope//2+crossover_scope)]
-            agent_indices = np.where(local_map > 0)
 
-            if len(agent_indices[0]) == 0 or predator.crossover:
-                continue
+        predators = list(self.predators.values())
+        np.random.shuffle(predators)
 
-            for candidate_x, candidate_y in zip(agent_indices[0], agent_indices[1]):
-                candidate_id = local_map[candidate_x, candidate_y]
-                candidate_agent = self.agents[candidate_id]
-                #predator.checked.append(candidate_agent.id)
-                if (candidate_agent.predator and not candidate_agent.crossover and predator.id != candidate_agent.id and \
-                        predator.id not in candidate_agent.checked and len(self.predators) <= self.args.predator_capacity) and predator.age > self.args.min_crossover_age and candidate_agent.age > self.args.min_crossover_age:
-                    candidate_agent.get_closer = True
-                    if np.random.rand() < crossover_rate and flag:
-                        #for i in range(np.random.randint(self.args.max_predator_offsprings)+1):
-                        child = Agent()
-                        child.id = self.max_id
-                        self.max_id += 1
-                        new_embedding = np.random.normal(size=[self.agent_emb_dim])
-                        self.agent_embeddings[child.id] = new_embedding
-                        child.life = np.random.normal(500, scale=100)
-                        child.predator = True
+        for i in range(num):
+            predator = predators[i*2]
+            candidate_agent = predators[i*2+1]
 
+            child = Agent()
+            child.id = self.max_id
+            self.max_id += 1
+            new_embedding = np.random.normal(size=[self.agent_emb_dim])
+            self.agent_embeddings[child.id] = new_embedding
+            child.life = np.random.normal(500, scale=100)
+            child.predator = True
 
-                        child.health = np.random.uniform(self.min_health, self.max_health)
+            rate = np.random.rand()
+            child.health = np.random.uniform(self.min_health, self.max_health)
 
-                        rate = np.random.rand()
-                        if np.random.rand() < mutation_prob:
-                            child.attack = (rate*predator.gene_attack+(1-rate)*candidate_agent.gene_attack) + np.random.normal()
-                        else:
-                            child.attack = (rate*predator.gene_attack+(1-rate)*candidate_agent.gene_attack)
+            rate = np.random.rand()
+            if np.random.rand() < mutation_prob:
+                child.attack = (rate*predator.gene_attack+(1-rate)*candidate_agent.gene_attack) + np.random.normal()
+            else:
+                child.attack = (rate*predator.gene_attack+(1-rate)*candidate_agent.gene_attack)
 
-                        rate = np.random.rand()
-                        if np.random.rand() < mutation_prob:
-                            child.resilience = (rate*predator.gene_resilience+(1-rate)*candidate_agent.gene_resilience) + np.random.normal()
-                        else:
-                            child.resilience = (rate*predator.gene_resilience+(1-rate)*candidate_agent.gene_resilience)
+            child.resilience = 1.
 
 
-                        child.gene_attack = child.attack
-                        child.gene_resilience = child.resilience
+            child.gene_attack = child.attack
+            child.gene_resilience = child.resilience
 
-                        predator.reward = child.gene_attack + child.gene_resilience
-                        candidate_agent.reward = child.gene_attack + child.gene_resilience
+            predator.reward = child.gene_attack + child.gene_resilience
+            candidate_agent.reward = child.gene_attack + child.gene_resilience
 
-                        child.hunt_square = self.max_hunt_square
-                        child.property = [self._gen_power(child.id), [0, 0, 1]]
-                        x = ind[0][perm[index]]
-                        y = ind[1][perm[index]]
-                        index += 1
-                        self.map[x][y] = child.id
-                        self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = child.id
-                        child.pos = (x, y)
-                        self.predators[child.id] = child
-                        self.predator_num += 1
-                        ### decrease health?
-                        #candidate_agent.health -= 0.1
-                        #predator.health -= 0.1
-                        self.increase_predators += 1
-                        candidate_agent.crossover = True
-                        predator.crossover = True
-                        flag = False
+            child.hunt_square = self.max_hunt_square
+            child.property = [self._gen_power(child.id), [0, 0, 1]]
+            x = ind[0][perm[i]]
+            y = ind[1][perm[i]]
+            self.map[x][y] = child.id
+            self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = child.id
+            child.pos = (x, y)
+            self.predators[child.id] = child
+            self.predator_num += 1
+            ### decrease health?
+            #candidate_agent.health -= 0.1
+            #predator.health -= 0.1
 
-    def crossover_prey(self, crossover_scope=3, crossover_rate=0.001, mutation_prob=0.001):
+    def crossover_prey(self, prob, mutation_prob=0.001):
+        num = max(1, int(self.prey_num* prob))
+        self.increase_preys = num
         ind = np.where(self.map == 0)
         perm = np.random.permutation(np.arange(len(ind[0])))
         index = 0
-        for prey in list(self.preys.values()):
-            x, y = prey.pos
-            local_map = self.large_map[(self.w+x-crossover_scope//2):(self.w+x-crossover_scope//2+crossover_scope), (self.h+y-crossover_scope//2):(self.h+y-crossover_scope//2+crossover_scope)]
-            agent_indices = np.where(local_map > 0)
-            flag = True
 
-            if len(agent_indices[0]) == 0 or prey.crossover:
-                continue
+        preys = list(self.preys.values())
+        np.random.shuffle(preys)
 
-            for candidate_x, candidate_y in zip(agent_indices[0], agent_indices[1]):
-                candidate_id = local_map[candidate_x, candidate_y]
-                candidate_agent = self.agents[candidate_id]
-                #prey.checked.append(candidate_agent.id)
+        for i in range(num):
+            prey = preys[i*2]
+            candidate_agent = preys[i*2+1]
+            child = Agent()
+            child.id = self.max_id
+            self.max_id += 1
+            child.predator = False
+            child.life = np.random.normal(500, scale=100)
+            child.health = 1
 
-                if (not candidate_agent.predator and not candidate_agent.crossover and candidate_agent.id != prey.id and \
-                        prey.id not in candidate_agent.checked and prey.age > self.args.min_crossover_age and candidate_agent.age > self.args.min_crossover_age \
-                        and len(self.preys) <= self.args.prey_capacity):
-                    candidate_agent.get_closer = True
-                    if np.random.rand() < crossover_rate and flag:
-                        #for i in range(np.random.randint(self.args.max_prey_offsprings)+1):
-                        child = Agent()
-                        child.id = self.max_id
-                        self.max_id += 1
-                        child.predator = False
-                        child.life = np.random.normal(500, scale=100)
-                        child.health = 1
+            child.attack = 1
 
-                        rate = np.random.rand()
-                        if np.random.rand() < mutation_prob:
-                            child.attack = (rate*prey.gene_attack+(1-rate)*candidate_agent.gene_attack) + np.random.normal()
-                        else:
-                            child.attack = (rate*prey.gene_attack+(1-rate)*candidate_agent.gene_attack)
+            rate = np.random.rand()
+            if np.random.rand() < mutation_prob:
+                child.resilience = (rate*prey.gene_resilience+(1-rate)*candidate_agent.gene_resilience) + np.random.normal()
+            else:
+                child.resilience = (rate*prey.gene_resilience+(1-rate)*candidate_agent.gene_resilience)
 
-                        rate = np.random.rand()
-                        if np.random.rand() < mutation_prob:
-                            child.resilience = (rate*prey.gene_resilience+(1-rate)*candidate_agent.gene_resilience) + np.random.normal()
-                        else:
-                            child.resilience = (rate*prey.gene_resilience+(1-rate)*candidate_agent.gene_resilience)
+            rate = np.random.rand()
+            if np.random.rand() < mutation_prob:
+                speed = (rate*prey.gene_speed+(1-rate)*candidate_agent.gene_speed) + np.random.normal()
+                speed = np.clip(speed, self.min_speed, self.max_speed)
+                child.speed = int(speed)
+            else:
+                child.speed = int(np.round(rate*prey.gene_speed+(1-rate)*candidate_agent.gene_speed))
 
-                        rate = np.random.rand()
-                        if np.random.rand() < mutation_prob:
-                            speed = (rate*prey.gene_speed+(1-rate)*candidate_agent.gene_speed) + np.random.normal()
-                            speed = np.clip(speed, self.min_speed, self.max_speed)
-                            child.speed = int(speed)
-                        else:
-                            child.speed = int(np.round(rate*prey.gene_speed+(1-rate)*candidate_agent.gene_speed))
+            child.gene_attack = child.attack
+            child.gene_resilience = child.resilience
+            child.gene_speed = child.speed
+            prey.reward = child.gene_attack + child.gene_resilience
+            candidate_agent.reward = child.gene_attack + child.gene_resilience
 
-                        child.gene_attack = child.attack
-                        child.gene_resilience = child.resilience
-                        child.gene_speed = child.speed
-                        prey.reward = child.gene_attack + child.gene_resilience
-                        candidate_agent.reward = child.gene_attack + child.gene_resilience
-
-                        new_embedding = np.random.normal(size=[self.agent_emb_dim])
-                        self.agent_embeddings[child.id] = new_embedding
-                        child.hunt_square = self.max_hunt_square
-                        child.property = [self._gen_power(child.id), [1, 0, 0]]
-                        x = ind[0][perm[index]]
-                        y = ind[1][perm[index]]
-                        index += 1
-                        self.map[x][y] = child.id
-                        self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = child.id
-                        child.pos = (x, y)
-                        self.preys[child.id] = child
-                        self.prey_num += 1
-
-                        #candidate_agent.health -= 0.1
-                        #prey.health -= 0.1
-                        self.increase_preys += 1
-                        flag = False
-                        candidate_agent.crossover = True
-                        prey.crossover = True
+            new_embedding = np.random.normal(size=[self.agent_emb_dim])
+            self.agent_embeddings[child.id] = new_embedding
+            child.hunt_square = self.max_hunt_square
+            child.property = [self._gen_power(child.id), [1, 0, 0]]
+            x = ind[0][perm[i]]
+            y = ind[1][perm[i]]
+            index += 1
+            self.map[x][y] = child.id
+            self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = child.id
+            child.pos = (x, y)
+            self.preys[child.id] = child
+            self.prey_num += 1
 
 
     def store_parameters(self, agent):
@@ -593,6 +554,7 @@ def get_obs(env, only_view=False):
         killed = dict(killed)
         global _killed
         _killed = killed
+
         global killed_preys
         killed_preys = list(killed.values())
 
@@ -626,7 +588,7 @@ def get_obs(env, only_view=False):
 
 def _get_obs(agent):
     x, y = agent.pos
-    obs = np.zeros((7, vision_width, vision_height))
+    obs = np.zeros((8, vision_width, vision_height))
     obs[:3, :, :] = np.broadcast_to(np.array(_property[0][1]).reshape((3, 1, 1)), (3, vision_width, vision_height))
     local_map = large_map[(w+x-vision_width//2):(w+x-vision_width//2+vision_width), (h+y-vision_height//2):(h+y-vision_height//2+vision_height)]
     agent_indices = np.where(local_map!=0)
@@ -635,6 +597,7 @@ def _get_obs(agent):
             return (agent.id, obs[:4].reshape(-1))
         else:
             return (agent.id, obs)
+
     for other_x, other_y in zip(agent_indices[0], agent_indices[1]):
         id_ = local_map[other_x, other_y]
 
@@ -691,9 +654,6 @@ def _get_reward(agent):
             num = killed_preys.count(_killed[agent.id])
             reward += 1./num
 
-        if agent.crossover:
-            reward += 1
-            #reward += agent.reward
 
         if agent.health <= 0:
             reward -= 4
@@ -704,12 +664,13 @@ def _get_reward(agent):
         if agent.id in _killed.values() or agent.health  <= 0:
             reward -= 4
 
-        if agent.crossover:
-           reward += 1
+        #if agent.crossover:
+        #   reward += 1
 
         if reward ==0:
             reward += 0.001
             #reward += agent.reward
+        #else:
         #    reward += 0.2
 
     return (agent.id, reward)

@@ -204,7 +204,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
                 candidate_agent = self.agents[candidate_id]
                 predator.checked.append(candidate_agent.id)
                 if (candidate_agent.predator and not candidate_agent.crossover and predator.id != candidate_agent.id and \
-                    predator.id not in candidate_agent.checked and predator.age > self.args.min_crossover_age and len(self.predator_agents) <= self.args.predator_capacity):
+                    predator.id not in candidate_agent.checked and len(self.predator_agents) <= self.args.predator_capacity):
                     candidate_agent.get_closer = True
                     if np.random.rand() < crossover_rate and flag:
                         for i in range(np.random.randint(self.args.max_predator_offsprings)+1):
@@ -268,7 +268,7 @@ class SimplePopulationDynamicsGA(BaseEnv):
                 prey.checked.append(candidate_agent.id)
 
                 if (not candidate_agent.predator and not candidate_agent.crossover and candidate_agent.id != prey.id and \
-                        prey.id not in candidate_agent.checked and prey.age > self.args.min_crossover_age and len(self.prey_agents) <= self.args.prey_capacity):
+                        prey.id not in candidate_agent.checked and prey.age > self.args.min_crossover_age and candidate_agent.age > self.args.min_crossover_age and len(self.prey_agents) <= self.args.prey_capacity):
                     candidate_agent.get_closer = True
                     if np.random.rand() < crossover_rate and flag:
                         for i in range(np.random.randint(self.args.max_prey_offsprings)+1):
