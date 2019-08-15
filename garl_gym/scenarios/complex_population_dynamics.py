@@ -490,7 +490,7 @@ class ComplexPopulationDynamics(BaseEnv):
                         del self.preys[agent.id]
                         self.prey_num -= 1
                         killed.append(agent.id)
-            elif self.killed[agent.id] is not None and self.killed[agent.id] not in killed:
+            elif agent.predator and self.killed[agent.id] is not None and self.killed[agent.id] not in killed:
                 prey_id = self.killed[agent.id]
                 prey = self.agents[prey_id]
                 predator = agent
@@ -532,6 +532,10 @@ def get_obs(env, only_view=False):
     agent_embeddings = env.agent_embeddings
     global agents
     agents = env.agents
+    global predators
+    predators = env.predators
+    global preys
+    preys = env.preys
     global max_health
     max_health = env.max_health
     global max_speed
@@ -585,30 +589,26 @@ def get_obs(env, only_view=False):
 
     #global _killed
     #_killed = killed
+    killed = []
+    resiliences = {}
+    for agent in predators.values():
+        killed.append(_get_killed(agent, resiliences))
+    killed = dict(killed)
+    global _killed
+    _killed = killed
+    global killed_preys
+    killed_preys = list(killed.values())
+    global _resiliences
+    _resiliences = resiliences
+
 
     if env.args.multiprocessing and len(agents)>4000:
-        pool = mp.Pool(processes=cores)
-        killed = pool.map(_get_killed, agents.values())
-        pool.close()
-        killed = dict(killed)
-        global _killed
-        _killed = killed
-        global killed_preys
-        killed_preys = list(killed.values())
 
         pool = mp.Pool(processes=cores)
         rewards = pool.map(_get_reward, agents.values())
         pool.close()
         pool.join()
     else:
-        killed = []
-        for agent in agents.values():
-            killed.append(_get_killed(agent))
-        killed = dict(killed)
-        global _killed
-        _killed = killed
-        global killed_preys
-        killed_preys = list(killed.values())
 
         rewards = []
         for agent in agents.values():
@@ -654,9 +654,7 @@ def _get_obs(agent):
     else:
         return (agent.id, obs)
 
-def _get_killed(agent):
-    if not agent.predator:
-        return (agent.id, None)
+def _get_killed(agent, resiliences):
     x, y = agent.pos
     min_dist = np.inf
     target_prey = None
@@ -680,6 +678,10 @@ def _get_killed(agent):
 
     if target_prey is not None:
         killed_id = target_prey.id
+        if killed_id in resiliences.keys():
+            resiliences[killed_id] -= agent.attack
+        else:
+            resiliences[killed_id] = target_prey.resilience-agent.attack
     return (agent.id, killed_id)
 
 
@@ -687,7 +689,7 @@ def _get_killed(agent):
 def _get_reward(agent):
     reward = 0
     if agent.predator:
-        if _killed[agent.id] is not None:
+        if _killed[agent.id] is not None and _resiliences[_killed[agent.id]]:
             num = killed_preys.count(_killed[agent.id])
             reward += 1./num
 
@@ -701,7 +703,7 @@ def _get_reward(agent):
         if reward ==0:
             reward -= 0.001
     else:
-        if agent.id in _killed.values() or agent.health  <= 0:
+        if (agent.id in _resiliences and _resiliences[agent.id] <= 0) or agent.health  <= 0:
             reward -= 4
 
         if agent.crossover:

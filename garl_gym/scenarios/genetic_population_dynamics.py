@@ -151,7 +151,8 @@ class GeneticPopulationDynamics(BaseEnv):
             if i < self.predator_num:
                 agent.predator = True
                 agent.id = self.max_id
-                agent.speed = 1
+                agent.speed = np.random.randint(self.min_speed, self.max_speed)
+                agent.gene_speed = agent.speed
                 agent.hunt_square = self.max_hunt_square
                 agent.property = [self._gen_power(i+1), [0, 0, 1]]
             else:
@@ -184,67 +185,6 @@ class GeneticPopulationDynamics(BaseEnv):
             #self.l_preys = lproxy[1]
             #self.l_predators = self.predators
             #self.l_preys = self.preys
-
-
-    def add_predators(self, num):
-        self.increase_predators += num
-        ind = np.where(self.map == 0)
-        perm = np.random.permutation(np.arange(len(ind[0])))
-
-        for i in range(num):
-            agent = Agent()
-            health = np.random.uniform(self.min_health, self.max_health)
-            agent.health = health
-            agent.birth_time = self.timestep
-            agent.predator = True
-
-            agent.id = self.max_id
-            agent.attack = np.random.uniform(self.min_attack, self.max_attack)
-            agent.resilience = np.random.uniform(self.min_resilience, self.max_resilience)
-            agent.gene_attack = agent.attack
-            agent.gene_resilience = agent.resilience
-            self.max_id += 1
-            agent.speed = 1
-            agent.life = np.random.normal(500, 100)
-            agent.hunt_square = self.max_hunt_square
-            agent.property = [self._gen_power(agent.id), [0, 0, 1]]
-            x = ind[0][perm[i]]
-            y = ind[1][perm[i]]
-            if self.map[x][y] == 0:
-                self.map[x][y] = agent.id
-                self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = agent.id
-                agent.pos = (x, y)
-            self.predators[agent.id] = agent
-
-    def add_preys(self, num):
-        self.increase_preys += num
-        ind = np.where(self.map == 0)
-        perm = np.random.permutation(np.arange(len(ind[0])))
-        for i in range(num):
-            agent = Agent()
-            health = np.random.uniform(self.min_health, self.max_health)
-            agent.health = health
-            agent.birth_time = self.timestep
-            agent.predator = False
-            agent.life = np.random.normal(500, 100)
-            agent.attack = np.random.uniform(self.min_attack, self.max_attack)
-            agent.resilience = np.random.uniform(self.min_resilience, self.max_resilience)
-            agent.gene_attack = agent.attack
-            agent.gene_resilience = agent.resilience
-            agent.speed = np.random.randint(self.min_speed, self.max_speed)
-            agent.gene_speed = agent.speed
-
-            agent.id = self.max_id
-            self.max_id += 1
-            agent.property = [self._gen_power(agent.id), [1, 0, 0]]
-            x = ind[0][perm[i]]
-            y = ind[1][perm[i]]
-            if self.map[x][y] == 0:
-                self.map[x][y] = agent.id
-                self.large_map[x:self.large_map.shape[0]:self.map.shape[0], y:self.large_map.shape[1]:self.map.shape[1]] = agent.id
-                agent.pos = (x, y)
-            self.preys[agent.id] = agent
-
 
 
     def gen_wall(self, prob=0, seed=10):
@@ -331,6 +271,15 @@ class GeneticPopulationDynamics(BaseEnv):
 
             child.resilience = 1.
 
+            if np.random.rand() < mutation_prob:
+                speed = (rate*predator.gene_speed+(1-rate)*candidate_agent.gene_speed) + np.random.normal()
+                speed = np.clip(speed, self.min_speed, self.max_speed)
+                child.speed = int(speed)
+            else:
+                child.speed = int(np.round(rate*predator.gene_speed+(1-rate)*candidate_agent.gene_speed))
+
+            child.gene_speed = child.speed
+
 
             child.gene_attack = child.attack
             child.gene_resilience = child.resilience
@@ -387,6 +336,7 @@ class GeneticPopulationDynamics(BaseEnv):
             else:
                 child.speed = int(np.round(rate*prey.gene_speed+(1-rate)*candidate_agent.gene_speed))
 
+            child.gene_speed = child.speed
             child.gene_attack = child.attack
             child.gene_resilience = child.resilience
             child.gene_speed = child.speed
@@ -451,7 +401,7 @@ class GeneticPopulationDynamics(BaseEnv):
                         del self.preys[agent.id]
                         self.prey_num -= 1
                         killed.append(agent.id)
-            elif self.killed[agent.id] is not None and self.killed[agent.id] not in killed:
+            elif agent.predator and self.killed[agent.id] is not None and self.killed[agent.id] not in killed:
                 prey_id = self.killed[agent.id]
                 prey = self.agents[prey_id]
                 predator = agent
@@ -493,6 +443,10 @@ def get_obs(env, only_view=False):
     agent_embeddings = env.agent_embeddings
     global agents
     agents = env.agents
+    global predators
+    predators = env.predators
+    global preys
+    preys = env.preys
     global max_health
     max_health = env.max_health
     global max_speed
@@ -546,31 +500,26 @@ def get_obs(env, only_view=False):
 
     #global _killed
     #_killed = killed
+    killed = []
+    resiliences = {}
+    for agent in predators.values():
+        killed.append(_get_killed(agent, resiliences))
+    killed = dict(killed)
+    global _killed
+    _killed = killed
+    global killed_preys
+    killed_preys = list(killed.values())
+    global _resiliences
+    _resiliences = resiliences
+
 
     if env.args.multiprocessing and len(agents)>4000:
-        pool = mp.Pool(processes=cores)
-        killed = pool.map(_get_killed, agents.values())
-        pool.close()
-        killed = dict(killed)
-        global _killed
-        _killed = killed
-
-        global killed_preys
-        killed_preys = list(killed.values())
 
         pool = mp.Pool(processes=cores)
         rewards = pool.map(_get_reward, agents.values())
         pool.close()
         pool.join()
     else:
-        killed = []
-        for agent in agents.values():
-            killed.append(_get_killed(agent))
-        killed = dict(killed)
-        global _killed
-        _killed = killed
-        global killed_preys
-        killed_preys = list(killed.values())
 
         rewards = []
         for agent in agents.values():
@@ -588,7 +537,7 @@ def get_obs(env, only_view=False):
 
 def _get_obs(agent):
     x, y = agent.pos
-    obs = np.zeros((8, vision_width, vision_height))
+    obs = np.zeros((7, vision_width, vision_height))
     obs[:3, :, :] = np.broadcast_to(np.array(_property[0][1]).reshape((3, 1, 1)), (3, vision_width, vision_height))
     local_map = large_map[(w+x-vision_width//2):(w+x-vision_width//2+vision_width), (h+y-vision_height//2):(h+y-vision_height//2+vision_height)]
     agent_indices = np.where(local_map!=0)
@@ -617,9 +566,7 @@ def _get_obs(agent):
     else:
         return (agent.id, obs)
 
-def _get_killed(agent):
-    if not agent.predator:
-        return (agent.id, None)
+def _get_killed(agent, resiliences):
     x, y = agent.pos
     min_dist = np.inf
     target_prey = None
@@ -643,6 +590,10 @@ def _get_killed(agent):
 
     if target_prey is not None:
         killed_id = target_prey.id
+        if killed_id in resiliences.keys():
+            resiliences[killed_id] -= agent.attack
+        else:
+            resiliences[killed_id] = target_prey.resilience-agent.attack
     return (agent.id, killed_id)
 
 

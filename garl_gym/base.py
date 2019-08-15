@@ -250,7 +250,7 @@ class BaseEnv(object):
         #for i in range(self.predator_num):
         #for i in range(len(self.agents)):
             #self.agents[i].health -= self.args.damage_per_step
-        agent.health -= self.args.damage_per_step
+        agent.health -= self.args.damage_per_step * agent.speed
 
     def increase_health(self, agent):
         agent = self.agents[agent.id]
