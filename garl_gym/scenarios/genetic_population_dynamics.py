@@ -277,7 +277,7 @@ class GeneticPopulationDynamics(BaseEnv):
                 child.speed = int(speed)
             else:
                 child.speed = int(np.round(rate*predator.gene_speed+(1-rate)*candidate_agent.gene_speed))
-
+            #child.speed = 1
             child.gene_speed = child.speed
 
 
@@ -335,6 +335,7 @@ class GeneticPopulationDynamics(BaseEnv):
                 child.speed = int(speed)
             else:
                 child.speed = int(np.round(rate*prey.gene_speed+(1-rate)*candidate_agent.gene_speed))
+            #child.speed = 1
 
             child.gene_speed = child.speed
             child.gene_attack = child.attack
@@ -449,8 +450,6 @@ def get_obs(env, only_view=False):
     preys = env.preys
     global max_health
     max_health = env.max_health
-    global max_speed
-    max_speed = env.max_speed
     global max_resilience
     max_resilience = env.max_resilience
     global max_attack
@@ -527,7 +526,7 @@ def get_obs(env, only_view=False):
             rewards.append(reward)
 
     for id, killed_agent in killed.items():
-        if killed_agent is not None:
+        if killed_agent is not None and _resiliences[_killed[id]] <= 0:
             env.increase_health(agents[id])
     #killed = list(killed.values())
 
@@ -601,7 +600,7 @@ def _get_killed(agent, resiliences):
 def _get_reward(agent):
     reward = 0
     if agent.predator:
-        if _killed[agent.id] is not None:
+        if _killed[agent.id] is not None and _resiliences[_killed[agent.id]] <= 0:
             num = killed_preys.count(_killed[agent.id])
             reward += 1./num
 
@@ -612,7 +611,8 @@ def _get_reward(agent):
         if reward ==0:
             reward -= 0.001
     else:
-        if agent.id in _killed.values() or agent.health  <= 0:
+        #if agent.id in _killed.values() or agent.health  <= 0:
+        if (agent.id in _resiliences and _resiliences[agent.id] <= 0) or agent.health  <= 0:
             reward -= 4
 
         #if agent.crossover:
