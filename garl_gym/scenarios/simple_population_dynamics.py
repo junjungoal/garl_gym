@@ -176,8 +176,8 @@ class SimplePopulationDynamics(BaseEnv):
         for i in range(num):
             #if np.random.rand() < prob:
             agent = Agent()
-            agent.health = 1
-            agent.original_health = 1
+            agent.health = np.random.uniform(self.min_health, self.max_health)
+            agent.original_health = agent.health
             agent.birth_time = self.timestep
             agent.predator = True
 
@@ -512,7 +512,7 @@ def _get_killed(agent, killed):
         id_ = local_map[candidate_x, candidate_y]
         candidate_agent = agents[id_]
 
-        if not candidate_agent.predator and not candidate_agent.id in dict(killed).values():
+        if not candidate_agent.predator and candidate_agent.id not in dict(killed).values():
             x_prey, y_prey = candidate_agent.pos
             dist = np.sqrt((x-x_prey)**2+(y-y_prey)**2)
             if dist < min_dist:
