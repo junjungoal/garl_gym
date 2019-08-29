@@ -449,8 +449,6 @@ def get_obs(env, only_view=False):
     preys = env.preys
     global max_health
     max_health = env.max_health
-    global max_speed
-    max_speed = env.max_speed
     global max_resilience
     max_resilience = env.max_resilience
     global max_attack
@@ -527,7 +525,7 @@ def get_obs(env, only_view=False):
             rewards.append(reward)
 
     for id, killed_agent in killed.items():
-        if killed_agent is not None:
+        if killed_agent is not None and resiliences[killed_agent.id] <= 0:
             env.increase_health(agents[id])
     #killed = list(killed.values())
 
@@ -597,14 +595,16 @@ def _get_killed(agent, resiliences):
     return (agent.id, killed_id)
 
 
-
 def _get_reward(agent):
     reward = 0
     if agent.predator:
-        if _killed[agent.id] is not None:
+        if _killed[agent.id] is not None and _resiliences[_killed[agent.id]]:
             num = killed_preys.count(_killed[agent.id])
             reward += 1./num
 
+        if agent.crossover:
+            reward += 1
+            #reward += agent.reward
 
         if agent.health <= 0:
             reward -= 4
@@ -612,17 +612,17 @@ def _get_reward(agent):
         if reward ==0:
             reward -= 0.001
     else:
-        if agent.id in _killed.values() or agent.health  <= 0:
+        if (agent.id in _resiliences and _resiliences[agent.id] <= 0) or agent.health  <= 0:
             reward -= 4
 
-        #if agent.crossover:
-        #   reward += 1
+        if agent.crossover:
+           reward += 1
 
         if reward ==0:
             reward += 0.001
             #reward += agent.reward
-        #else:
         #    reward += 0.2
 
     return (agent.id, reward)
+
 

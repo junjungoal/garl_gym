@@ -538,8 +538,6 @@ def get_obs(env, only_view=False):
     preys = env.preys
     global max_health
     max_health = env.max_health
-    global max_speed
-    max_speed = env.max_speed
     global max_resilience
     max_resilience = env.max_resilience
     global max_attack

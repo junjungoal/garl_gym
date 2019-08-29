@@ -534,12 +534,12 @@ def _get_reward(agent):
             reward -= 0.001
 
         if agent.health <= 0:
-            reward -= 1
+            reward -= 4
 
     else:
         reward = 0
         if agent.id in _killed.values():
-            reward -= 1
+            reward -= 4
         else:
             reward += 0.001
         #else:
