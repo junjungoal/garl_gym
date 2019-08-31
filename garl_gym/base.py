@@ -8,8 +8,19 @@ from garl_gym.core import Agent
 import cv2
 
 class BaseEnv(object):
+    """
+    A parent class for environments
+    """
 
     def variation_make_world(self, wall_prob=0):
+        """
+        Generates an environment for the experiment which veirfies if agents are trained or not.
+        Three types of agnets (random policy, trained policy without any continual learning, trained policy with continual learning)
+        The proportion of the initial population among three types of agnets are same
+
+        Args:
+            wall_prob: the probability of generating a wall block at the specific coordinate
+        """
         self.gen_wall(wall_prob)
 
         random_predators = {}
@@ -93,7 +104,10 @@ class BaseEnv(object):
             self.training_preys = training_preys
 
 
-    def make_world(self, wall_prob=0, food_prob=0.1, seed=100):
+    def make_world(self, wall_prob=0, seed=100):
+        """
+        initialise an environment 
+        """
         self.gen_wall(wall_prob)
 
         predators = {}

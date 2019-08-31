@@ -16,18 +16,9 @@ from scipy.stats import norm
 
 class GeneticPopulationDynamics(BaseEnv):
     '''
--    args:
--        - height
--        - width
--        - batch_size
--        - view_args
--        - agent_numbee
--        - num_actions ... not necessary(add flag?)
--        - damage_per_step
--
--    In the future, we define the attack ?
--    If continuous, then size and speed?
--    '''
+    Args:
+        args(dict):  A dictionary of parameters such as height, width, and predator_num
+    '''
 
     def __init__(self, args):
         self.args = args
@@ -124,7 +115,13 @@ class GeneticPopulationDynamics(BaseEnv):
 
 
 
-    def make_world(self, wall_prob=0, wall_seed=10, food_prob=0.1, food_seed=10):
+    def make_world(self, wall_prob=0, wall_seed=10):
+        '''
+        This function needs to be called at the initialisation
+        Args:
+            wall_prob: Probability of generating a wall on a cell
+            wall_seed: Random seed for walls
+        '''
         self.gen_wall(wall_prob, wall_seed)
 
         predators = {}
@@ -178,13 +175,6 @@ class GeneticPopulationDynamics(BaseEnv):
 
             self.predators = predators
             self.preys = preys
-            #lproxy = mp.Manager().list()
-            #lproxy.append({})
-            #lproxy.append({})
-            #self.l_predators = lproxy[0]
-            #self.l_preys = lproxy[1]
-            #self.l_predators = self.predators
-            #self.l_preys = self.preys
 
 
     def gen_wall(self, prob=0, seed=10):
@@ -194,14 +184,10 @@ class GeneticPopulationDynamics(BaseEnv):
 
         for i in range(self.h):
             for j in range(self.w):
-                #if i == 0 or i == self.h-1 or j == 0 or j == self.w - 1:
-                #    self.map[i][j] = -1
-                #    continue
                 wall_prob = np.random.rand()
                 buffer = []
                 connected_wall = []
                 if wall_prob < prob:
-                    #self.map[i][j] = -1
                     buffer.append((i, j))
                     connected_wall.append((i, j))
 
@@ -225,19 +211,14 @@ class GeneticPopulationDynamics(BaseEnv):
         self.property[0] = [1, [0.411, 0.411, 0.411]]
 
 
-    def increase_food(self, prob):
-        num = max(1, int(self.num_food * prob))
-        ind = np.where(self.food_map==0)
-        num = min(num, len(ind[0]))
-        perm = np.random.permutation(np.arange(len(ind[0])))
-        for i in range(num):
-            x = ind[0][perm[i]]
-            y = ind[1][perm[i]]
-            if self.map[x][y] != -1 and self.food_map[x][y] == 0:
-                self.food_map[x][y] = -2
-                self.num_food += 1
-
     def crossover_predator(self, prob, mutation_prob=0.001):
+        '''
+        Crossover function for predators
+
+        Args:
+           prob: Ratio against the population. This determins how many agents are chosen for the crossover
+           mutation_prob: Mutation probability
+        '''
 
         num = max(1, int(self.predator_num* prob))
         self.increase_predators = num
@@ -277,7 +258,6 @@ class GeneticPopulationDynamics(BaseEnv):
                 child.speed = int(speed)
             else:
                 child.speed = int(np.round(rate*predator.gene_speed+(1-rate)*candidate_agent.gene_speed))
-            #child.speed = 1
             child.gene_speed = child.speed
 
 
@@ -296,11 +276,15 @@ class GeneticPopulationDynamics(BaseEnv):
             child.pos = (x, y)
             self.predators[child.id] = child
             self.predator_num += 1
-            ### decrease health?
-            #candidate_agent.health -= 0.1
-            #predator.health -= 0.1
 
     def crossover_prey(self, prob, mutation_prob=0.001):
+        '''
+        Crossover function for preys
+
+        Args:
+           prob: Ratio against the population. This determins how many agents are chosen for the crossover
+           mutation_prob: Mutation probability
+        '''
         num = max(1, int(self.prey_num* prob))
         self.increase_preys = num
         ind = np.where(self.map == 0)
@@ -335,7 +319,6 @@ class GeneticPopulationDynamics(BaseEnv):
                 child.speed = int(speed)
             else:
                 child.speed = int(np.round(rate*prey.gene_speed+(1-rate)*candidate_agent.gene_speed))
-            #child.speed = 1
 
             child.gene_speed = child.speed
             child.gene_attack = child.attack
@@ -384,6 +367,10 @@ class GeneticPopulationDynamics(BaseEnv):
 
 
     def remove_dead_agents(self):
+        '''
+        Remove dead agents from the environment
+        '''
+
         killed = []
         self.reset_parameters()
         for agent in self.agents.values():
@@ -426,14 +413,25 @@ class GeneticPopulationDynamics(BaseEnv):
 
 
     def reset(self):
+        '''
+        Reset the environment
+        '''
+
         self.__init__(self.args)
         self.agent_embeddings = {}
-        self.make_world(wall_prob=self.args.wall_prob, wall_seed=np.random.randint(5000), food_prob=self.args.food_prob)
+        self.make_world(wall_prob=self.args.wall_prob, wall_seed=np.random.randint(5000))
 
         return get_obs(self, only_view=True)
 
 
 def get_obs(env, only_view=False):
+    '''
+    Returns observations, rewards and Ids of killed agents
+
+    Args:
+        only_view (bool): If true, then return observations, rewards and ids of killed agents, otherwise only observations
+
+    '''
     global agent_emb_dim
     agent_emb_dim = env.agent_emb_dim
     global vision_width
