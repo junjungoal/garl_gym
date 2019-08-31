@@ -157,6 +157,9 @@ class BaseEnv(object):
         raise NotImplementedError
 
     def dump_image(self, img_name):
+        '''
+        Save the full observation of the environment as an image
+        '''
         new_w, new_h = self.w * 5, self.h * 5
         img = np.zeros((new_w, new_h, 3), dtype=np.uint8)
         length = self.args.img_length
@@ -198,6 +201,13 @@ class BaseEnv(object):
         return img
 
     def take_actions(self, actions):
+        '''
+        Take action for each agent
+
+        Args:
+            actions (dict): {id: action(int) for agent 1, id: action(int) for agent 2, ....id: action(int) for agnet N}
+        '''
+
         for id, action in actions.items():
             agent = self.agents[id]
             if agent.predator:
@@ -261,6 +271,12 @@ class BaseEnv(object):
         self.map[new_x][new_y] = agent.id
 
     def decrease_health(self, agent):
+        '''
+        decrease health of predator
+
+        Args:
+            agent (Agent): An instance of Agnet class
+        '''
         #for i in range(self.predator_num):
         #for i in range(len(self.agents)):
             #self.agents[i].health -= self.args.damage_per_step
@@ -268,6 +284,12 @@ class BaseEnv(object):
         agent.health -= self.args.damage_per_step
 
     def increase_health(self, agent):
+        '''
+        increase health of predator
+
+        Args:
+            agent (Agent): An instance of Agent class
+        '''
         agent = self.agents[agent.id]
         if hasattr(self.args, 'health_increase_rate') and self.args.health_increase_rate is not None:
             agent.health += self.args.health_increase_rate
@@ -358,6 +380,14 @@ class BaseEnv(object):
                 return power_list
 
     def gen_wall(self, prob=0, seed=10):
+        '''
+        Generates walls
+
+        Args:
+            prob: The probability of geenrating a wall on a cell
+            seed: random seed
+        '''
+
         if prob == 0:
             return
 
@@ -390,6 +420,13 @@ class BaseEnv(object):
 
 
     def add_predators(self, num):
+        '''
+        Add predators
+
+        Args:
+            num: Number of predator this function generates
+        '''
+
         self.increase_predators += num
         ind = np.where(self.map == 0)
         perm = np.random.permutation(np.arange(len(ind[0])))
@@ -433,6 +470,12 @@ class BaseEnv(object):
                     self.predators[agent.id] = agent
 
     def add_preys(self, num):
+        '''
+        Add preys
+
+        Args:
+            num: Number of prey this function generates
+        '''
         self.increase_preys += num
         ind = np.where(self.map == 0)
         perm = np.random.permutation(np.arange(len(ind[0])))

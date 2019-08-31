@@ -32,6 +32,9 @@ class DiscreteWorld(object):
         raise NotImplementedError
 
 class Agent(object):
+    '''
+    Agent class
+    '''
     def __init__(self):
         self.predator = True
         self.health = None
@@ -66,9 +69,4 @@ class Agent(object):
         self.gene_resilience = None
         self.gene_attack = None
 
-    def utility(self):
-        if self.predator:
-            return (self.physical + self.environmental_condition)**self.liking
-        else:
-            return -((1-self.physical)+(1-self.environmental_condition))**self.liking
 
