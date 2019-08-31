@@ -1,4 +1,4 @@
-# garl_gym
+# Realistic simulated environment for a predator-prey ecosystem
 
 ## Installation
 
