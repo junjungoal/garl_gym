@@ -16,17 +16,8 @@ from garl_gym.core import DiscreteWorld, Agent
 
 class SimplePopulationDynamics(BaseEnv):
     '''
-    args:
-        - height
-        - width
-        - batch_size
-        - view_args
-        - agent_numbee
-        - num_actions ... not necessary(add flag?)
-        - damage_per_step
-
-    In the future, we define the attack ?
-    If continuous, then  and speed?
+    Args:
+        args(dict):  A dictionary of parameters such as height, width, and predator_num
     '''
 
     def __init__(self, args):
@@ -93,13 +84,6 @@ class SimplePopulationDynamics(BaseEnv):
             self.experiment_type = None
 
 
-    #@property
-    #def predators(self):
-    #    return self.agents[:self.predator_num]
-
-    #@property
-    #def preys(self):
-    #    return self.agents[self.predator_num:]
     @property
     def predator_agents(self):
         if self.experiment_type == 'variation':
@@ -163,6 +147,12 @@ class SimplePopulationDynamics(BaseEnv):
                 self.num_food += 1
 
     def increase_predator(self, prob):
+        '''
+        Generates new predators
+
+        Args:
+            prob: Ratio against the population which determins how many new agents generated.
+        '''
         num = max(1, int(self.predator_num* prob))
         self.increase_predators = num
 
@@ -172,9 +162,7 @@ class SimplePopulationDynamics(BaseEnv):
             total = len(self.random_predators) + len(self.trained_predators) + len(self.training_predators)
             p=[len(self.random_predators)/total, len(self.trained_predators)/total, len(self.training_predators)/total]
 
-        #for i in range(len(self.predator_agents)):
         for i in range(num):
-            #if np.random.rand() < prob:
             agent = Agent()
             agent.health = np.random.uniform(self.min_health, self.max_health)
             agent.original_health = agent.health
@@ -208,6 +196,12 @@ class SimplePopulationDynamics(BaseEnv):
                 self.predator_num += 1
 
     def increase_prey(self, prob):
+        '''
+        Generates new preys
+
+        Args:
+            prob: Ratio against the population which determins how many new agents generated.
+        '''
         num = max(1, int(self.prey_num* prob))
         self.increase_preys = num
         ind = np.where(self.map == 0)
@@ -249,6 +243,9 @@ class SimplePopulationDynamics(BaseEnv):
                 self.prey_num += 1
 
     def remove_dead_agents(self):
+        '''
+        Remove dead agents from the environment
+        '''
         killed = []
         for agent in self.agents.values():
             #if agent.health <= 0 or np.random.rand() < 0.05:
@@ -306,6 +303,9 @@ class SimplePopulationDynamics(BaseEnv):
         return killed
 
     def reset(self):
+        '''
+        Reset the environment
+        '''
         self.__init__(self.args)
         if self.experiment_type == 'variation':
             self.variation_make_world(wall_prob=self.args.wall_prob)
@@ -316,6 +316,14 @@ class SimplePopulationDynamics(BaseEnv):
 
 
 def get_obs(env, only_view=False):
+    '''
+    Returns observations, rewards and Ids of killed agents
+
+    Args:
+        only_view (bool): If true, then return observations, rewards and ids of killed agents, otherwise only observations
+
+    '''
+
     global agent_emb_dim
     agent_emb_dim = env.agent_emb_dim
     global vision_width

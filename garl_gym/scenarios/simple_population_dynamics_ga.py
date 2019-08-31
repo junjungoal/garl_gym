@@ -16,18 +16,9 @@ from scipy.stats import norm
 
 class SimplePopulationDynamicsGA(BaseEnv):
     '''
--    args:
--        - height
--        - width
--        - batch_size
--        - view_args
--        - agent_numbee
--        - num_actions ... not necessary(add flag?)
--        - damage_per_step
--
--    In the future, we define the attack ?
--    If continuous, then size and speed?
--    '''
+    Args:
+        args(dict):  A dictionary of parameters such as height, width, and predator_num
+    '''
 
     def __init__(self, args):
         self.args = args
@@ -186,6 +177,13 @@ class SimplePopulationDynamicsGA(BaseEnv):
                 self.num_food += 1
 
     def crossover_predator(self, crossover_scope=3, crossover_rate=0.001):
+        '''
+        Mating function which generates new agents with the given probability if agents are within a certain square
+
+        Args:
+            crossover_scope: Scope of crossover. If two agents are within this scope, then those agents are candidates for the crossover
+            crossover_rate: The probability that two agents successfully reproduce a new agent
+        '''
 
         ind = np.where(self.map == 0)
         perm = np.random.permutation(np.arange(len(ind[0])))
@@ -245,11 +243,16 @@ class SimplePopulationDynamicsGA(BaseEnv):
                             else:
                                 self.predators[child.id] = child
 
-                            ### decrease health?
-                            #candidate_agent.health -= 0.1
-                            #predator.health -= 0.1
 
     def crossover_prey(self, crossover_scope=3, crossover_rate=0.001):
+        '''
+        Mating function which generates new agents with the given probability if agents are within a certain square
+
+        Args:
+            crossover_scope: Scope of crossover. If two agents are within this scope, then those agents are candidates for the crossover
+            crossover_rate: The probability that two agents successfully reproduce a new agent
+        '''
+
         ind = np.where(self.map == 0)
         perm = np.random.permutation(np.arange(len(ind[0])))
         index = 0
@@ -313,6 +316,10 @@ class SimplePopulationDynamicsGA(BaseEnv):
                             flag = False
 
     def remove_dead_agents(self):
+        '''
+        Remove dead agents from the environment
+        '''
+
         killed = []
         for agent in self.agents.values():
             #if agent.health <= 0 or np.random.rand() < 0.05:
@@ -386,6 +393,14 @@ class SimplePopulationDynamicsGA(BaseEnv):
 
 
 def get_obs(env, only_view=False):
+    '''
+    Returns observations, rewards and Ids of killed agents
+
+    Args:
+        only_view (bool): If true, then return observations, rewards and ids of killed agents, otherwise only observations
+
+    '''
+
     global agent_emb_dim
     agent_emb_dim = env.agent_emb_dim
     global vision_width
